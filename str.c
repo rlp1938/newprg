@@ -179,7 +179,7 @@ memdel(mdata *md, char *find)
 { /* If 'find' is not found just do nothing. Deletes 1st ocurrence. */
   size_t sz = strlen(find);
   if (!sz) return;
-  char *cp memmem(md->fro, md->to - md->fro, find, sz);
+  char *cp = memmem(md->fro, md->to - md->fro, find, sz);
   if (!cp) return;
   memmove(cp, cp + sz, sz);
   md->to -= sz;
@@ -467,13 +467,16 @@ stripcomment(mdata *md, const char *cmopn, const char *cmend,
     if (lopend) szcmt += szc;
     if (szcmt < PATH_MAX) {
       char buf[PATH_MAX];
+      strncpy(buf, cp, szcmt);
+      buf[szcmt] = 0;
+      memdel(md, buf);
     } else {
       char *buf = xmalloc(szcmt + 1);
+      strncpy(buf, cp, szcmt);
+      buf[szcmt] = 0;
+      memdel(md, buf);
+      free(buf);
     }
-    strncpy(buf, cp, szcmt);
-    buf[szcmt] = 0;
-    memdel(md, buf);
-    if(szcmt >= PATH_MAX) free(buf);
     // do nothing with cp, the target data has been changed.
   } // while()
 } // stripcomment()
