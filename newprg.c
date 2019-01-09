@@ -168,7 +168,7 @@ is_this_first_run(void)
   if (!checkfirstrun("newprg", names)) {
     firstrun("newprg", names);
     fprintf(stderr,
-          "Please edit newprg.cfg in %s.config/newprg"
+          "Please edit newprg.cfg in %s/.config/newprg"
           " to meet your needs.\n",
           getenv("HOME"));
     exit(EXIT_SUCCESS);
