@@ -9,3 +9,9 @@
 /newprg
 /newprg.plist/
 /gengnu
+/Makefile.in
+/config.log
+/config.status
+/configure
+/configure.ac
+/stamp-h1
