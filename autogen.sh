@@ -25,7 +25,7 @@
 autoscan
 mv configure.scan configure.ac
 # customise it for this project
-sed -i 's/FULL-PACKAGE-NAME/newprogram/' configure.ac
+sed -i 's/FULL-PACKAGE-NAME/newprg/' configure.ac
 sed -i 's/VERSION/1.0/' configure.ac
 sed -i 's/BUG-REPORT-ADDRESS/rlp1938@gmail.com/' configure.ac
 sed -i '/AC_CONFIG_SRCDIR/ i : ${CFLAGS=""}' configure.ac
@@ -33,3 +33,4 @@ sed -i '/AC_CONFIG_SRCDIR/ i AM_INIT_AUTOMAKE' configure.ac
 autoheader
 aclocal
 automake --add-missing --copy
+autoconf
