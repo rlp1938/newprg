@@ -41,7 +41,7 @@ typedef struct progid { /* vars to use in Makefile.am etc */
   char *exe;    // program name.
   char *src;    // source code name.
   char *thr;    // three letter abbreviation.
-  char *ucs;    // upper case name (man page title)
+  char *mpt;    // man page title
   char *man;    // manpage name.
   char *author; // program author name.
   char *email;  // author email address.
@@ -98,9 +98,10 @@ static void newopt_tfree(newopt_t *no);
 #include "files.h"
 #include "gopt.h"
 #include "firstrun.h"
-
+static char *version;
 static void is_this_first_run(void);
-static prgvar_t *non_option_args(options_t *optp, char **argv);
+static prgvar_t *prog_args(options_t *optp, char **argv);
+
 static progid *makeprogname(const char *);
 static void makepaths(prgvar_t *pv);
 static void makelists(prgvar_t *pv, options_t *optp);
@@ -138,10 +139,11 @@ static void ulstr(int, char *);
 
 int main(int argc, char **argv)
 {  /* newprogram - write the initial files for a new C program. */
+  version = "1.0";
   is_this_first_run(); // check first run
   // data gathering
   options_t opt = process_options(argc, argv); // options processing
-  prgvar_t *pv = non_option_args(&opt, argv);
+  prgvar_t *pv = prog_args(&opt, argv);
   makepaths(pv);  // full paths to newprogram dir and source libs.
   makelists(pv, &opt);  // space separated long strings to char **
   /* pv->optsout has the new options in coded form (as user input)
@@ -176,7 +178,7 @@ is_this_first_run(void)
 } // is_this_first_run()
 
 prgvar_t
-*non_option_args(options_t *optp, char **argv)
+*prog_args(options_t *optp, char **argv)
 {/* Uses the global options vars, optind etc*/
   if (!argv[optind]) {
     fputs("No project name provided.\n", stderr);
@@ -189,7 +191,7 @@ prgvar_t
   memset(pv, 0, sizeof(struct prgvar_t));
   pv->pi = makeprogname(pname);  // variations on the project name.
   return pv;
-} // non_option_args()
+} // prog_args()
 
 progid
 *makeprogname(const char *pname)
@@ -198,11 +200,7 @@ progid
    * and ->thr = nam .
   */ 
   char name[NAME_MAX], lcname[NAME_MAX];
-  progid *prid = malloc(sizeof(progid));
-  if (!prid) {
-    fputs("Out of memory.\n", stderr);
-    exit(EXIT_FAILURE);
-  }
+  progid *prid = xmalloc(sizeof(progid));
   strcpy(name, pname);
   ulstr('l', name);
   strcpy(lcname, name);  // keep pristine lower case copy
@@ -211,15 +209,22 @@ progid
   prid->src = xstrdup(name);  // source code
   strcpy(name, lcname);
   strcat(name, ".1");
-  prid->man = xstrdup(name);  // manpage
+  prid->man = xstrdup(name);  // manpage name
   strcpy(name, lcname);
   name[3] = 0;
   prid->thr = xstrdup(name);  // 3 letter abbreviation for Makefile.am
   strcpy(name, lcname);
   name[0] = toupper(name[0]);
-  prid->dir = xstrdup(name);
-  prid->author = cfg_getparameter("newprg", "prdata.cfg", "author");
-  prid->email = cfg_getparameter("newprg", "prdata.cfg", "email");
+  prid->dir = xstrdup(name);  // project dir name
+  strcpy(name, lcname);
+  ulstr('u', name);
+  prid->mpt = xstrdup(name);  // manpage title
+  char ubuf[PATH_MAX];  // get the users name and config path.
+  strcpy(ubuf, getenv("USER"));
+  strjoin(ubuf, '/', ".config/newprg/newprg.cfg", PATH_MAX);
+  mdata *md = initconfigread(ubuf);
+  prid->author = cfg_getparameter("newprg", "newprg.cfg", "author");
+  prid->email = cfg_getparameter("newprg", "newprg.cfg", "email");
   return prid;
 } // makeprogname()
 
