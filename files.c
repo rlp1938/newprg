@@ -329,5 +329,9 @@ mdata
 *initconfigread(const char *path)
 {
   mdata *md = readfile(path, 1, 0);
-  
+  /* strip comments is hard wired here, until and unless I start using
+   * configs that use other commenting conventions.
+  */
+  stripcomment(md, "#", "\n", 0); // do not lop ending newline.
+  return md;
 } // initconfigread()
