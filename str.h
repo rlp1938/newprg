@@ -119,4 +119,6 @@ char
 void
 stripcomment(mdata *md, const char *cmopn, const char *cmend,
               int lopend);
+char
+
 #endif
