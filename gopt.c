@@ -1,6 +1,6 @@
 /*      gopt.c
  *
- *  Copyright 2017 Robert L (Bob) Parker rlp1938@gmail.com
+ *  Copyright 2019 Robert L (Bob) Parker rlp1938@gmail.com
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -24,11 +24,10 @@
 
 options_t process_options(int argc, char **argv)
 {
-  optstring = ":hd:ox:n:D::";  // initialise
+  optstring = ":hd:x:n:";  // initialise
 
   options_t opts;
-  opts.hasopts        = 0;
-  opts.del_target     = 'q';
+  opts.runhelp         = 0;
   opts.software_deps  = NULL;
   opts.extra_data     = NULL;
   opts.options_list   = NULL;
@@ -49,9 +48,7 @@ options_t process_options(int argc, char **argv)
     {"help",          0,  0,  'h' },
     {"depends",       1,  0,  'd' },
     {"extra-dist",    1,  0,  'x' },
-    {"with-options",  0,  0,  'o' },
     {"options-list",  1,  0,  'n' },
-    {"delete-target", 2,  0,  'D' },
     {0,  0,  0,  0 }
     };
 
@@ -67,65 +64,34 @@ options_t process_options(int argc, char **argv)
       } // switch()
     break;
     case 'h':
-      dohelp(0);
+      opts.runhelp = 1;
     break;
-    case 'd':  // software dependencies for Makefile.am
-      if (strlen(joinbuffer)) {
-        strjoin(joinbuffer, ' ',optarg, max);
-      } else strcpy(joinbuffer, optarg);
+    case 'd':  // output software dependencies for Makefile.am
+      strjoin(joinbuffer, ' ',optarg, max);
     break;
-    case 'o':  // just set a flag for main()
-    // deal with -n seen before -o, or -o not done.
-      opts.hasopts = 1;
-    break;
-    case 'n':  // code strings for options generation.
-      if (strlen(optionsbuffer) == 0) {
-        strcpy(optionsbuffer, optarg);
-      } else strjoin(optionsbuffer, ' ', optarg, max);
-      opts.hasopts = 1;  // generates -o option anyway
+    case 'n':  // output options descriptor strings.
+      strjoin(optionsbuffer, ';', optarg, max);
     break;
     case 'x':  // other data for Makefile.am
-      if (strlen(databuffer)) {
-        strjoin(databuffer, ' ',optarg, max);
-      } else strcpy(databuffer, optarg);
-    break;
-    case 'D':  // delete target dir if it exists YNQ
-      opts.del_target = 'q';
-      if (optarg) {
-        if (optarg[0] == 'Y' || optarg[0] == 'y') {
-          opts.del_target = 'y';
-        } else if (optarg[0] == 'N' || optarg[0] == 'n') {
-          opts.del_target = 'n';
-        } // allow any other nonsense to return the default
-      }
+      strjoin(databuffer, ' ',optarg, max);
     break;
     case ':':
       fprintf(stderr, "Option %s requires an argument\n",
           argv[this_option_optind]);
-      dohelp(1);
+      opts.runhelp = 1;
     break;
     case '?':
       fprintf(stderr, "Unknown option: %s\n",
            argv[this_option_optind]);
-      dohelp(1);
+      opts.runhelp = 1;
     break;
     } // switch()
   } // while()
-  if (opts.hasopts) {
-    if (strlen(joinbuffer)) {
-      strjoin(joinbuffer, ' ', "gopt.c+h", PATH_MAX);
-    } else {
-      strcpy(joinbuffer, "gopt.c+h");
-    }
+  if (strlen(joinbuffer)) {
     opts.software_deps = xstrdup(joinbuffer);
   }
   if (strlen(databuffer)) {
     opts.extra_data = xstrdup(databuffer);
-  }
-  if (opts.hasopts) {
-    if (strlen(optionsbuffer)) {
-      strjoin(optionsbuffer, ' ', "hhelp;", max);
-    } else strcpy(optionsbuffer, "hhelp;");
   }
   if (strlen(optionsbuffer)) {
     opts.options_list = xstrdup(optionsbuffer);    
@@ -133,16 +99,3 @@ options_t process_options(int argc, char **argv)
   return opts;
 } // process_options()
 
-void dohelp(int forced)
-{
-  char command[PATH_MAX];
-  char *dev = "./newprogram.1";
-  char *prd = "newprogram";
-  if (exists_file(dev)) {
-    sprintf(command, "man %s", dev);
-  } else {
-    sprintf(command, "man 1 %s", prd);
-  }
-  xsystem(command, 1);
-  exit(forced);
-} // dohelp()

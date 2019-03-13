@@ -1,6 +1,6 @@
 /*      gopt.h
  *
- *  Copyright 2017 Robert L (Bob) Parker rlp1938@gmail.com
+ *  Copyright 2019 Robert L (Bob) Parker rlp1938@gmail.com
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -24,14 +24,13 @@
 char *optstring;
 
 typedef struct options_t {
-	int hasopts;          // main() needs this flag.
-  int del_target;       // delete newprog target dir
+  int runhelp;          // main() invokes help()
 	char *software_deps;  // source files to include.
 	char *extra_data;     // eg stuff like config files.
-	char *options_list;   // code to describe options for new program.
+	char *options_list;   // output options description text.
 } options_t;
 
-void dohelp(int forced);
+
 options_t process_options(int argc, char **argv);
 
 #endif

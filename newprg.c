@@ -59,7 +59,6 @@ typedef struct oplist_t {  /* var to use when generating options */
                          n - interger to be input, default 0; int
                          s - c string to be input, default NULL; char *
                          d - a double to be input, default 0.0; double
-                         0 - nothing set; this is the help option
                       */
   int    optarg;      // 0,1 or 2.
 } oplist_t;
@@ -99,7 +98,9 @@ static void newopt_tfree(newopt_t *no);
 #include "gopt.h"
 #include "firstrun.h"
 static char *version;
+static void dohelp(int forced);
 static void is_this_first_run(void);
+static prgvar_t *action_options(options_t *optp);
 static prgvar_t *prog_args(options_t *optp, char **argv);
 
 static progid *makeprogname(const char *);
@@ -142,8 +143,11 @@ int main(int argc, char **argv)
   version = "1.0";
   is_this_first_run(); // check first run
   // data gathering
-  options_t opt = process_options(argc, argv); // options processing
-  prgvar_t *pv = prog_args(&opt, argv);
+  options_t opt = process_options(argc, argv);
+  prgvar_t *pv = action_options(&opt);
+  pv = prog_args(&opt, argv);
+  char **configs = loadconfigs("newprg");
+  exit(0);
   makepaths(pv);  // full paths to newprogram dir and source libs.
   makelists(pv, &opt);  // space separated long strings to char **
   /* pv->optsout has the new options in coded form (as user input)
@@ -220,7 +224,7 @@ progid
   ulstr('u', name);
   prid->mpt = xstrdup(name);  // manpage title
   char ubuf[PATH_MAX];  // get the users name and config path.
-  strcpy(ubuf, getenv("USER"));
+  strcpy(ubuf, getenv("HOME"));
   strjoin(ubuf, '/', ".config/newprg/newprg.cfg", PATH_MAX);
   mdata *md = initconfigread(ubuf);
   prid->author = cfg_getparameter("newprg", "newprg.cfg", "author");
@@ -941,10 +945,10 @@ void
 prgvar_tfree(prgvar_t *pv)
 { /* allow that any object to free may be NULL */
   if (!pv) return;
-  if (pv->optsout)    destroystrarray(pv->optsout, 0);
+  if (pv->optsout)    freestringlist(pv->optsout, 0);
   if (pv->pi)         progidfree(pv->pi);
-  if (pv->libswlist)  destroystrarray(pv->libswlist, 0);
-  if (pv->extras)     destroystrarray(pv->extras, 0);
+  if (pv->libswlist)  freestringlist(pv->libswlist, 0);
+  if (pv->extras)     freestringlist(pv->extras, 0);
   if (pv->newdir)     free(pv->newdir);
   if (pv->linksdir)   free(pv->linksdir);
   if (pv->stubsdir)   free(pv->stubsdir);
@@ -994,3 +998,29 @@ char
   return buf;
 } // get_today()
 
+void dohelp(int forced)
+{
+  char command[PATH_MAX];
+  char *dev = "./newprg.1";
+  char *prd = "newprg";
+  if (exists_file(dev)) {
+    sprintf(command, "man %s", dev);
+  } else {
+    sprintf(command, "man 1 %s", prd);
+  }
+  xsystem(command, 1);
+  exit(forced);
+} // dohelp()
+
+prgvar_t *action_options(options_t *optp)
+{
+/*
+typedef struct options_t {
+	char *software_deps;  // source files to include.
+	char *extra_data;     // eg stuff like config files.
+	char *options_list;   // output options description text.
+} options_t;
+*/
+  if (optp->runhelp) dohelp(0);  // exits, no return;
+  
+}
