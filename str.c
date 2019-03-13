@@ -24,13 +24,7 @@
  * */
 
 #include "str.h"
-
-size_t
-lenrequired(size_t nominal_len)
-{ /* Ensure that memory operations always have 8 bytes to spare. */
-	const size_t fudgefence = 8;
-	return nominal_len + fudgefence;
-} // lenrequired()
+#include "files.h"
 
 size_t
 countmemstr(mdata *md)
@@ -83,8 +77,9 @@ meminsert(const char *line, mdata *dd, size_t meminc)
 {	/* insert line into the data block described by dd, taking care of
 	 * necessary memory reallocation as needed.
 	*/
+  const size_t fence = 8;
 	size_t len = strlen(line);
-	size_t safelen = lenrequired(len);
+	size_t safelen = len + fence;
 	if (safelen > (unsigned)(dd->limit - dd->to)) { // >= 0 always
 		/* Ensure that line always has room to fit. */
 		size_t needed = (meminc > safelen) ? meminc : safelen;
@@ -173,18 +168,6 @@ memresize(mdata *dd, off_t change)
 		memset(dd->to, 0, dd->limit - dd->to);
 	}
 } // memresize()
-
-void
-memdel(mdata *md, char *find)
-{ /* If 'find' is not found just do nothing. Deletes 1st ocurrence. */
-  size_t sz = strlen(find);
-  if (!sz) return;
-  char *cp = memmem(md->fro, md->to - md->fro, find, sz);
-  if (!cp) return;
-  memmove(cp, cp + sz, sz);
-  md->to -= sz;
-} // memdel()
-
 
 int
 memlinestostr(mdata *md)
@@ -394,7 +377,7 @@ trimspace(char *buf)
 } // trimws()
 
 void
-destroystrarray(char **wordlist, size_t count)
+freestringlist(char **wordlist, size_t count)
 {/* Frees list of strings. If count is non-zero, frees count strings,
   * otherwise it assumes wordlist has a NULL terminator.
 */
@@ -408,7 +391,7 @@ destroystrarray(char **wordlist, size_t count)
 		}
 	}
 	free(wordlist);
-} // destroystrarray()
+} // freestringlist()
 
 int
 instrlist(const char *name, char **list)
@@ -448,35 +431,95 @@ char
 }
 
 void
-stripcomment(mdata *md, const char *cmopn, const char *cmend,
-              int lopend)
-{ /* strip all comments from a data block. */
-  char *cp = md->fro;
-  size_t szo = strlen(cmopn);
-  while ((cp = memmem(cp, md->to - cp, cmopn, szo))) {
-    size_t szc = strlen(cmend);
-    char *eoc = memmem(cp, md->to - cp, cmend, szc);
-    if (!eoc) {
-      fputs("No comment terminator:\n", stderr);
-      fwrite(cp, 70, 1, stderr);
+memdel(mdata *md, const char *tofind)
+{ /* if the string tofind exists delete the first instance, else do
+   * nothing.
+  */
+  size_t len = strlen(tofind);
+  if (!(len)) return;
+  char *cp = memmem(md->fro, md->to - md->fro, tofind, len);
+  if (cp) {
+    char *end = cp + len;
+    memmove(cp, end, md->to - end);
+    md->to -= len;
+  }
+} // memdel()
+
+void
+stripcomment(mdata *md, const char *opn, const char *cls, int lopcls)
+{ /* Remove all comments from the data space identified by md.
+   * The strings to be removed are identified by opn at the start and
+   * cls at the end. If lopcls is non-zero delete the closing string
+   * also, otherwise don't.
+   * EG stripcomment(md "#", "\n", 0), stripcomment(md, "//", "\n", 0)
+   * stripcomment(md, "!<--", "-->", 1, removal of C style comments
+   * is similar.)
+  */
+  for (;;) {
+    size_t stlen = strlen(opn);
+    if (!(stlen)) return;
+    size_t enlen = strlen(cls);
+    if (!(enlen)) return;
+    char cmntbuf[PATH_MAX];
+    char *st = memmem(md->fro, md->to - md->fro, opn, stlen);
+    if (!st) break;
+    char *en = memmem(st, md->to - st, cls, enlen);
+    if (!en) break; // Any editors that don't put '\n' at end of file?
+    if (lopcls) en += enlen;
+    size_t cplen = en - st;
+    if (cplen >= PATH_MAX) {
+      fputs("Comment length is too big for buffer, quitting.\n",
+            stderr);
       exit(EXIT_FAILURE);
     }
-    size_t szcmt = eoc - cp;
-    /* If the comment is '<* ... *>' or '<!-- ... -->' lop the end
-     * but if '// ... \n' or '# ... \n' do not lop it. */
-    if (lopend) szcmt += szc;
-    if (szcmt < PATH_MAX) {
-      char buf[PATH_MAX];
-      strncpy(buf, cp, szcmt);
-      buf[szcmt] = 0;
-      memdel(md, buf);
-    } else {
-      char *buf = xmalloc(szcmt + 1);
-      strncpy(buf, cp, szcmt);
-      buf[szcmt] = 0;
-      memdel(md, buf);
-      free(buf);
-    }
-    // do nothing with cp, the target data has been changed.
-  } // while()
+    strncpy(cmntbuf, st, cplen);
+    cmntbuf[cplen] = 0;
+    memdel(md, cmntbuf);
+  }
 } // stripcomment()
+
+char
+**loadconfigs(const char *prgname)
+{ /* produces a NULL terminated list of strings of the form
+   * name1=param1, ... ,nameN=paramN, (char *)NULL
+  */
+  char buf[PATH_MAX]; // path to config file.
+  sprintf(buf, "%s/.config/%s/%s.cfg", getenv("HOME"),prgname, prgname);
+  mdata *md = initconfigread(buf);
+  size_t prmcount = countchar(md, '=');
+  char **cfgs = xmalloc((prmcount+1) * sizeof(char *));
+  cfgs = findconfigs(md, cfgs, prmcount);
+  return cfgs;
+} // loadconfigs()
+
+size_t
+countchar(mdata *md, const char ch)
+{ /* count given char, useful rarely. */
+  size_t count = 0;
+  char *loc = memchr(md->fro, ch, md->to - md->fro);
+  while ((loc = memchr(loc, ch, md->to - loc))) {
+    count++;
+    loc++;
+  }
+  return count;
+} // countchar()
+
+char
+**findconfigs(mdata *md, char **cfglist, size_t nrconfigs)
+{ /* duplicate the config strings onto the cfglist items */
+  char *eol = md->fro;
+  size_t i;
+  for (i = 0; i < nrconfigs; i++) {
+    char *eq = memchr(eol, '=', md->to - eol);  // next config line
+    char *bol = eq;
+    while (*bol != '\n') bol--;
+    bol++;
+    eol = eq; while (*eol != '\n') eol++;
+    char buf[NAME_MAX];
+    size_t len = eol - bol;
+    strncpy(buf, bol, len);
+    buf[len] = 0;
+    cfglist[i] = xstrdup(buf);
+  }
+  return cfglist;
+} // findconfigs()

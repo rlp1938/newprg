@@ -51,9 +51,6 @@ int
 printstrlist(char **list);
 
 size_t
-lenrequired(size_t nominal_len);
-
-size_t
 countmemstr(mdata *md);
 
 char
@@ -76,9 +73,6 @@ memreplace(mdata *md, char *find , char *repl, off_t meminc);
 
 void
 memresize(mdata *md, off_t meminc);
-
-void
-memdel(mdata *md, char *find);
 
 int
 memlinestostr(mdata *md);
@@ -105,7 +99,7 @@ void
 trimspace(char *buf);
 
 void
-destroystrarray(char **str_array, size_t count);
+freestringlist(char **str_array, size_t count);
 
 int
 instrlist(const char *find, char **list);
@@ -117,8 +111,18 @@ char
 **memblocktoarray(mdata *md, int n);
 
 void
-stripcomment(mdata *md, const char *cmopn, const char *cmend,
-              int lopend);
+memdel(mdata *md, const char *tofind);
+
+void
+stripcomment(mdata *md, const char *opn, const char *cls, int lop);
+
 char
+**loadconfigs(const char *prgname);
+
+size_t
+countchar(mdata *md, const char ch);
+
+char
+**findconfigs(mdata *md, char ** cfglist, size_t nrconfigs);
 
 #endif
