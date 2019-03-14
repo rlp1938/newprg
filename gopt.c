@@ -70,7 +70,7 @@ options_t process_options(int argc, char **argv)
       strjoin(joinbuffer, ' ',optarg, max);
     break;
     case 'n':  // output options descriptor strings.
-      strjoin(optionsbuffer, ';', optarg, max);
+      strjoin(optionsbuffer, ' ', optarg, max);
     break;
     case 'x':  // other data for Makefile.am
       strjoin(databuffer, ' ',optarg, max);
