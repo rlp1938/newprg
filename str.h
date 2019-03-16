@@ -128,4 +128,7 @@ char
 char
 **mdatatostringlist(mdata *md);
 
+mdata
+*append_eol(mdata *md);
+
 #endif

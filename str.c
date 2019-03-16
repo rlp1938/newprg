@@ -533,16 +533,7 @@ char
   */
   char *eod = md->to - 1; // check file is terminated with '\n'.
   if (*eod != '\n') {
-    if (md->limit > md->to) {
-      eod++;
-      *eod = '\n';
-      md->to++;
-    } else {
-      memresize(md, 8);
-      eod++;
-      *eod = '\n';
-      md->to++;
-    }
+    append_eol(md);
   }
   size_t linecount = countchar(md, '\n'); // size of output array
   char **retval = xmalloc((linecount+1) * sizeof(char*));
@@ -571,3 +562,21 @@ char
   retval[idx] = 0;
   return retval;  // some wasted char* likely due 0 length lines.
 } // mdatatostringlist()
+
+mdata
+*append_eol(mdata *md)
+{ /* If the last char in a text file is not '\n' append one. */
+  char *eod = md->to - 1;
+  if (*eod == '\n') return md;
+  if (md->limit > md->to) {
+    eod++;
+    *eod = '\n';
+    md->to++;
+  } else {
+    memresize(md, 8);
+    eod++;
+    *eod = '\n';
+    md->to++;
+  }
+  return md;
+} // append_eol()
