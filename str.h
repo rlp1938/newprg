@@ -125,4 +125,7 @@ countchar(mdata *md, const char ch);
 char
 **findconfigs(mdata *md, char ** cfglist, size_t nrconfigs);
 
+char
+**mdatatostringlist(mdata *md);
+
 #endif

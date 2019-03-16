@@ -215,26 +215,26 @@ strjoin(char *left, char sep, char *right, size_t max)
 	size_t llen = strlen(left);
 	if (!right) return;
 	size_t rlen = strlen(right);
-	size_t tlen = llen + rlen + 1;	// ignore sep == 0
+  if (rlen == 0) return;
+  if (sep == 0) {
+    fputs("Seperator may not be 0", stderr);
+    exit(EXIT_FAILURE);
+  }
+	size_t tlen = llen + rlen + 1;
 	if ( tlen >= max) {
 		fprintf(stderr, "String length %lu, to big for buffer %lu\n",
 				tlen, max);
 		exit(EXIT_FAILURE);
 	}
-	if (llen == 0 && sep == 0) {
-		strcpy(left, right);
-	} else if (sep == 0) {
-		strcpy(left + llen, right);	// slightly faster than strcat()??
-	} else {
-		char *joinp = left + llen;
-		if (*(joinp - 1) == sep || right[0] == sep) {
-    // ensure that the separator doesn't get doubled up.
-			strcpy(joinp, right);
-		} else {
-			*joinp = sep;
-			strcpy(joinp + 1, right);
-		}
-	}
+  if (llen == 0) {
+    strcpy(left, right);
+    return;
+  }
+  char sepstr[2];
+  sepstr[1] = 0;
+  sepstr[0] = sep;
+  strcat(left, sepstr);
+  strcat(left, right);
 } // strjoin()
 
 char
@@ -523,3 +523,51 @@ char
   }
   return cfglist;
 } // findconfigs()
+
+char
+**mdatatostringlist(mdata *md)
+{ /* mdata is always a block of lines from a text file.
+   * This returns an array of C strings, NULL terminated.
+   * Leading and trailing spaces are removed.
+   * Zero length strings are skipped.
+  */
+  char *eod = md->to - 1; // check file is terminated with '\n'.
+  if (*eod != '\n') {
+    if (md->limit > md->to) {
+      eod++;
+      *eod = '\n';
+      md->to++;
+    } else {
+      memresize(md, 8);
+      eod++;
+      *eod = '\n';
+      md->to++;
+    }
+  }
+  size_t linecount = countchar(md, '\n'); // size of output array
+  char **retval = xmalloc((linecount+1) * sizeof(char*));
+  size_t idx = 0;
+  char *line = md->fro;
+  while (line < md->to) {
+    char *eol = memchr(line, '\n', md->to - line);
+    *eol = 0;
+    char *begin = line;
+      while(isspace(*begin) && begin < eol) { // leading space
+        *begin = 0;
+        begin++;
+      } // while()
+        char *end = eol - 1;
+      while((isspace(*end)) && (end > begin)) {  // trailing space
+        *end = 0;
+        end--;
+      } // while()
+    size_t ll = strlen(begin); // ll may be 0
+    if (ll) {
+      retval[idx] = xstrdup(begin);
+      idx++;
+    }
+    line = eol + 1;
+  } // while()
+  retval[idx] = 0;
+  return retval;  // some wasted char* likely due 0 length lines.
+} // mdatatostringlist()
