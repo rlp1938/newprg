@@ -312,48 +312,37 @@ vfree(void *p, ...)
 }
 
 char
-**list2array(char *items, char sep)
+**list2array(char *items, char *sep)
 { /* Operates on a list of items, separated by sep, and returns a NULL
-   * terminated array of strings. Deals with lists that begin with sep
-   * or not and handles comma separated lists that may also have spaces
-   * before and/or after the actual text items.
+   * terminated array of strings.
   */
-	size_t lcount = 0;
-	int ilen = strlen(items);
-	if (ilen > PATH_MAX) {
-		fputs("Input string too long, quitting!\n", stderr);
-		exit(EXIT_FAILURE);
-	}
-	char list[PATH_MAX];
-	strcpy(list, items);
-	int i;
-	for (i = 0; i < ilen; i++) {
-		if(list[i] == sep) lcount++;
-	}
-	if (list[0] != sep) lcount++;	// number of list items
-	// make list of char*
-	char **result = xmalloc((lcount+1) * sizeof(char *));
-	result[lcount] = (char *)NULL;	// terminator
-	char *wbegin = list;
-	while (*wbegin == sep) wbegin++;
-	char *wend = strchr(wbegin, sep);
-	char word[PATH_MAX];
-	i = 0;
-	while (wend) {
-		*wend = 0;
-		strcpy(word, wbegin);
-		trimspace(word);
-		result[i] = xstrdup(word);
-		i++;
-		wbegin = wend + 1;
-		wend = strchr(wbegin, sep);
-	}
-	if (strlen(wbegin)) { // the last item
-		strcpy(word, wbegin);
-		trimspace(word);
-		result[i] = xstrdup(word);
-	}
-	return result;
+  size_t il = strlen(items);
+  size_t sl = strlen(sep);
+	il++;
+  char *buf = xmalloc(il * sizeof(char*));
+	strcpy(buf, items);
+  char *line = buf;
+  size_t lcount = 0;
+  while (1) {
+    char *sep_p = strstr(line, sep);
+    if (!sep_p) break;
+    lcount++;
+    line = sep_p + sl;
+  }
+  lcount += 2;  // count the last item + NULL pointer at end.
+  line = buf;
+  char **res = xmalloc(lcount * sizeof(char*));
+  size_t i;
+  for (i = 0; i < lcount; i++) {
+    char *sep_p = strstr(line, sep);
+    if (sep_p) *sep_p = 0;
+    res[i] = xstrdup(line);
+    if (sep_p) line = sep_p + sl;
+  }
+  lcount--;
+  res[lcount] = 0;
+  free(buf);
+	return res;
 } // list2array()
 
 void

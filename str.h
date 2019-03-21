@@ -93,7 +93,7 @@ void
 vfree(void *, ...);
 
 char
-**list2array(char *items, char sep);
+**list2array(char *items, char *sep);
 
 void
 trimspace(char *buf);
