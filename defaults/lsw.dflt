@@ -1,0 +1,6 @@
+# lsw.dflt - name default software source libraries
+# one per line, a space separated list, or a mixture of these.
+   str.h+c
+files.c+h    # leave trailing space
+dirs.h+c
+firstrun.c+h

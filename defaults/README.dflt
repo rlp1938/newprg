@@ -1,0 +1,11 @@
+README.dflt
+1. lsw.dflt - default software libraries, file is provided.
+2. options.dflt - default options to output, -h --help and -v --version
+   this file is provided.
+3. extra.dflt - there are 2 extras, and these are <newprg>.1 and
+   <newprg>.cfg. These are set in concrete in the Makefile.am in the
+   ./templates dir. The file, extra.dflt is not provided as installed,
+   but is the name to use if there are more extras required than are
+   provided here.
+
+   
