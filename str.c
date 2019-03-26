@@ -569,3 +569,27 @@ mdata
   }
   return md;
 } // append_eol()
+
+char
+*getconfig(const char **configs, char *cfgname)
+{ /* configs is an array of strings of form key=data, NULL terminated.
+    * returns data if found, other wise NULL.
+  */
+  static char buf[PATH_MAX];
+  size_t len = strlen(cfgname);
+  size_t i;
+  for (i = 0; configs[i]; i++) {
+    if (strncmp(configs[i], cfgname, len) == 0) {
+      char *eq = strchr(configs[i], '=');
+      if (eq) {
+        strcpy(buf, eq+1);
+        return buf;
+      } else {
+        fprintf(stderr, "Badly formed config item: %s\n", configs[i]);
+        exit(EXIT_FAILURE);
+      }
+    } // if(strncmp ...)
+  } // for (i = 0 ...)
+  return (char *)NULL;
+} // getconfig()
+
