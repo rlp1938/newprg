@@ -49,22 +49,6 @@ typedef struct progid { /* vars to use in Makefile.am etc */
 
 static void progidfree(progid *pi);
 
-typedef struct oplist_t {  /* var to use when generating options */
-  char  *shoptname;   // short options name.
-  char  *longoptname; // long options name.
-  char  *dataname;    // name of the opts variable.
-  char   datapurpose; /* what it's for, one of 'afnsdq'
-                         a - accumulator ie for --verbosity; int
-                         f - flag, set 0 or 1; int
-                         n - interger to be input, default 0; int
-                         s - c string to be input, default NULL; char *
-                         d - a double to be input, default 0.0; double
-                      */
-  int    optarg;      // 0,1 or 2.
-} oplist_t;
-
-static void optlist_tfree(oplist_t *ol);
-
 typedef struct prgvar_t { /* carries all vars needed to generate the
                               new program output.
                           */
@@ -96,7 +80,7 @@ typedef struct newopt_t { /* the options to be processed in the new
                     * string, C char*.
                     * block, a file path.
                   */
-  char *default;  // default value. May be 0 length, if so,
+  char *dflt_val;  // default value. May be 0 length, if so,
                   // "0", "0.0", or (char*) NULL will be used.
   char *max_val;  // If empty it will be ignored.
   char *help_txt; /* If empty, "FIXME" will be substituted.
@@ -125,13 +109,12 @@ static char **getoptionslist(const char *path, char *nameslist);
 static prgvar_t *makepaths(char **configs, prgvar_t *pv);
 static progid *makeprogname(const char *);
 static void maketargetdir(prgvar_t *pv);
-
-
-static char **csv2strs(char *longstr, char sep);
-static char *swdepends(char *optslist);
 static newopt_t **makenewoptionslist(prgvar_t *pv); // the array
 static newopt_t *makenewoptions(char *optsdescriptor);  // the struct
-static char *getoptsdataname(char *optsdescriptor);
+
+
+
+
 static int get_types_index(char *optsdescriptor);
 static char *getCdatatype(int idx);
 static char *gethelptext(int idx);
@@ -145,16 +128,10 @@ static void makemain(prgvar_t *pv);
 static void placelibs(prgvar_t *pv);
 static void generatemakefile(prgvar_t *pv);
 static void addautotools(prgvar_t *pv);
-static char *xgetcwd(char *buf, size_t size);
-static void generateoptionsheader(prgvar_t *pv, newopt_t **nopl);
-static void generateoptionsfunction(prgvar_t *pv, newopt_t **nopl);
-static char *genshortoptstring(newopt_t **nopl);
-static char *genlongoptstrings(newopt_t **nopl);
-static char *gencaseselector(newopt_t **nopl);
-static void generatemanpage(prgvar_t *pv, newopt_t **nopl);
+
+
 static char *ucstr(const char *str);
 static char *get_today(void);
-static char *genoptionshelp(newopt_t **nopl);
 static void makehelperscripts(prgvar_t *pv);
 static void ulstr(int, char *);
 
@@ -179,9 +156,7 @@ int main(int argc, char **argv)
   makemain(pv); // make the C source file.
   generatemakefile(pv); // convert makefile to suit the new program.
   addautotools(pv); // Create GNU file requirment
-  generateoptionsheader(pv, nopl);  // fills in the struct.
-  generateoptionsfunction(pv, nopl);  // gopt.c in newdir.
-  generatemanpage(pv, nopl);
+
   makehelperscripts(pv);
   progidfree(pv->pi);
   //prgvar_tfree(pv);
@@ -298,93 +273,6 @@ maketargetdir(prgvar_t *pv)
   newdir(pv->newdir, 0);
 } // maketargetdir()
 
-char **csv2strs(char *longstr, char sep)
-{ /* break the string into shorter pieces separated by sep and return
-  * a NULL terminated string array.
-  */
-  int count = 0;
-  size_t themax = PATH_MAX;
-  char buf[PATH_MAX];
-  if (strlen(longstr) >= themax)
-    printerr("String too long in csv2strs:\n", longstr, 1);
-  char *cp = longstr; // Possible to have longstr starting with ' '
-  if (*cp == ' ') {
-    while (*cp == ' ') cp++;
-  }
-  strcpy(buf, cp);
-  cp = buf;
-  char *ep = cp + strlen(cp);
-  while (cp < ep) {
-    if (*cp == sep) {
-      *cp = 0;
-      count++;
-    }
-    cp++;
-  }
-  count++;  // the last chunk won't have 'sep' on the end
-  char **ret = xmalloc((count + 1) * sizeof(char *));
-  memset(ret, 0, (count + 1) * sizeof(char *));
-  ret[count] = NULL;
-  int i;
-  cp = buf;
-  for (i = 0; i < count; i++) {
-    ret[i] = xstrdup(cp);
-    int l = strlen(cp);
-    cp += l + 1;
-  }
-  return ret;
-} // csv2strs()
-
-char
-*swdepends(char *optslist)
-{/* optslist may have software names in the form of name.h+c.
-  * Any such names will be expanded to name.h and name.c
-*/
-  if (!optslist) return NULL;
-
-  size_t olen = strlen(optslist);
-  if(!olen) return NULL;
-  char *ibuf = xmalloc(olen + 1);
-  strcpy(ibuf, optslist);
-  olen = strlen(ibuf);
-  char *fnp = ibuf;
-  char *guard = fnp + olen;
-  
-  size_t blen = 2*olen + 1;
-  char *obuf = xmalloc(blen);  // enough for every item name.h+c
-  fnp = ibuf;
-  while (fnp < guard) {
-    char *sp = strchr(fnp, ' ');
-    if (sp) *sp = 0;
-    fnp += strlen(fnp) + 1;
-  }
-
-  fnp = ibuf;
-  obuf[0] = 0;
-  while (fnp < guard) {
-    char name[NAME_MAX];
-    strcpy(name, fnp);
-    int obl = strlen(obuf);
-    char *plusp = strchr(name, '+');
-    if (plusp) {  // good for single char xtns only, eg name.h, name.c
-      *plusp = 0;
-      if (obl) strjoin(obuf, ' ', name, blen);
-      else strcpy(obuf, name);
-      *(plusp - 1) = *(plusp + 1);
-      strjoin(obuf, ' ', name, blen);
-    } else {
-      if (obl) strjoin(obuf, ' ', name, blen);
-      else strcpy(obuf, name);
-    }
-    fnp += strlen(fnp) + 1;
-  }
-  free(optslist);  // this was strdup()'d
-  char *ret = xstrdup(obuf);
-  free(obuf);
-  free(ibuf);
-  return ret;
-} // swdepends()
-
 newopt_t
 **makenewoptionslist(prgvar_t *pv)  // the array of structs
 { /* Using the array of chars describing each option as input, this
@@ -401,19 +289,10 @@ newopt_t
  
 newopt_t
 *makenewoptions(char *optsdescriptor) // the struct
-{ /* xextra:;Toptdataname afnsd */
+{ /* */
   int hasoptsdataname = validateoptsdescriptor(optsdescriptor);
   newopt_t *nop = xmalloc(sizeof(newopt_t));
-  int idx;
-  if (hasoptsdataname) nop->dataname = getoptsdataname(optsdescriptor);
-  if (hasoptsdataname) idx = get_types_index(optsdescriptor);
-  if (hasoptsdataname) nop->datatype = getCdatatype(idx);
-  if (hasoptsdataname) nop->helptext = gethelptext(idx);
-  if (hasoptsdataname) nop->action = getCaction(idx);
-  if (hasoptsdataname)
-    nop->optargrqd = getoptargrequired(optsdescriptor);
-  nop->shortname = getoptshortname(optsdescriptor);
-  nop->longname = getoptslongname(optsdescriptor);
+  
   
   return nop;
 } // makenewoptions()
@@ -431,16 +310,6 @@ validateoptsdescriptor(char *optsdescriptor)
   if (*cp == 0) ret = 0; else ret = 1;
   return ret;
 } // validateoptsdescriptor()
-
-char
-*getoptsdataname(char *optsdescriptor)
-{ /* Extract the data name from the descriptor and return a pointer
-     to it on the heap. */
-  char *cp = strchr(optsdescriptor, ';');
-  cp += 2;
-  char *ret = xstrdup(cp);
-  return ret;
-} // getoptsdataname()
 
 int
 get_types_index(char *optsdescriptor)
@@ -648,7 +517,6 @@ addautotools(prgvar_t *pv)
   if (exists_file(copying)) copyfile(copying, pathbuf);
 
   // run the autotools stuff
-  char *at = xgetcwd(pathbuf, PATH_MAX);  // must change into new dir.
   xchdir(pv->newdir);
   xsystem("autoscan", 1);
   mdata *cfd = readfile("configure.scan", 1, 128);
@@ -665,156 +533,7 @@ addautotools(prgvar_t *pv)
   xsystem("aclocal", 1);
   xsystem("automake --add-missing --copy", 1);
   xsystem("autoconf", 1);
-  xchdir(at);
 } // addautotools()
-
-void
-generateoptionsheader(prgvar_t *pv, newopt_t **nopl)
-{ /* replace '<struct>' in options_t with the list of opts variables */
-  char outbuf[PATH_MAX] = {0};
-  int i = 0;
-  while ((nopl[i])) {
-    if (nopl[i]->datatype) {  // options may exist with no data.
-      char wrk[NAME_MAX];
-      sprintf(wrk, "\t%s %s;\n", nopl[i]->datatype, nopl[i]->dataname);
-      strjoin(outbuf, 0, wrk, PATH_MAX);
-    }
-    i++;
-  }
-  char *cp = strrchr(outbuf, '\n');
-  *cp = 0;  // don't need the last '\n'
-  mdata *md = readfile("./templates/gopt.h", 1, 1024);
-  memreplace(md, "<struct>", outbuf, 1024);
-  memreplace(md, "char * ", "char *", 1024);  // tidy up o/p format.
-  char fnbuf[PATH_MAX];
-  sprintf(fnbuf, "%s/%s", pv->newdir, "gopt.h");
-  writefile(fnbuf, md->fro, md->to, "w");
-  free_mdata(md);
-} // generateoptionsheader()
-
-static void generateoptionsfunction(prgvar_t *pv, newopt_t **nopl)
-{ /* fills in the gaps in the stub file, ./templates/gopt.c */
-  mdata *md = readfile("./templates/gopt.c", 1, 1024);
-  memreplace(md, "progname", pv->pi->exe, 1024);  // manpage name.
-  char *sostr = genshortoptstring(nopl);
-  memreplace(md, "/* short options target */", sostr, 1024);
-  free(sostr);  // short options string.
-  char *lostr = genlongoptstrings(nopl);
-  memreplace(md, "/* long options target */", lostr, 1024);
-  free(lostr);  // long options string.
-  char *casestr = gencaseselector(nopl);
-  memreplace(md, "/* option proc target */", casestr, 1024);
-  free(casestr);
-  char fnbuf[PATH_MAX] = {0}; // write gopt.c in newdir.
-  sprintf(fnbuf, "%s/%s", pv->newdir, "gopt.c");
-  memreplace(md, "char * ", "char *", 1024);
-  writefile(fnbuf, md->fro, md->to, "w");
-  free_mdata(md);
-} // generateoptionsfunction()
-
-char
-*genshortoptstring(newopt_t **nopl)
-{
-  char so[NAME_MAX] = {0};
-  int i = 0;
-  while ((nopl[i])) {
-    if (nopl[i]->dataname) {  // ignore options w/o data.
-      strcat(so, nopl[i]->shortname);
-      switch(nopl[i]->optargrqd) {
-        case '1':
-          strcat(so, ":");
-        break;
-        case '2':
-          strcat(so, "::");
-        break;
-      } // switch()
-    } // if()
-    i++;
-  } // while()
-  char *ret = strdup(so); // caller to free
-  return ret;
-} // genshortoptstring()
-
-char
-*genlongoptstrings(newopt_t **nopl)
-{ /* build the additions to the long options array. */
-  char str[NAME_MAX] = {0};
-  char outbuf[PATH_MAX] = {0};
-  int i = 0;
-  while ((nopl[i])) {
-    if (nopl[i]->dataname) {
-      sprintf(str, "\t\t{\"%s\",\t%c,\t0,\t'%s'},\n",
-      nopl[i]->longname, nopl[i]->optargrqd, nopl[i]->shortname);
-      strcat(outbuf, str);
-    }  // if()
-    i++;
-  } // while()
-  char *cp = strrchr(outbuf, '\n');
-  *cp = '\0'; // don't need the last line end.
-  char *ret = xstrdup(outbuf);  // caller is to free this
-  return ret;
-} // genlongoptstrings()
-
-char
-*gencaseselector(newopt_t **nopl)
-{ /* make up the case statements */
-  char str[NAME_MAX] = {0};
-  char outbuf[PATH_MAX] = {0};
-  int i = 0;
-  while ((nopl[i])) {
-    if (nopl[i]->action) {
-      sprintf(str, "\t\tcase '%s':\n\t\t\t%s %s%s\n\t\tbreak;\n",
-      nopl[i]->shortname, nopl[i]->datatype, nopl[i]->dataname,
-      nopl[i]->action);
-      strcat(outbuf, str);
-    }  // if()
-    i++;
-  } // while()
-  char *cp = strrchr(outbuf, '\n');
-  *cp = '\0'; // don't need the last line end.
-  char *ret = xstrdup(outbuf);  // caller is to free this
-  return ret;
-} // gencaseselector()
-
-void
-generatemanpage(prgvar_t *pv, newopt_t **nopl)
-{ /* man page in markdown format for pandoc to convert */
-  mdata *md = readfile("./templates/manpage.1", 1, 1024);
-  char *cp = ucstr(pv->pi->exe);
-  memreplace(md, "PRGNAME", cp, 1024);
-  free(cp);
-  memreplace(md, "prgname", pv->pi->exe, 1024);
-  memreplace(md, "yyyy-mm-dd", get_today(), 1024);
-  cp = genoptionshelp(nopl);
-  memreplace(md, "<next>", cp, 1024);
-  char fnbuf[PATH_MAX] = {0}; // write prgname.md in newdir.
-  sprintf(fnbuf, "%s/%s", pv->newdir, pv->pi->man);
-  //memreplace(md, "char * ", "char *", 1024);
-  writefile(fnbuf, md->fro, md->to, "w");
-  free_mdata(md);
-} // generatemanpage()
-
-char
-*genoptionshelp(newopt_t **nopl)
-{ /* make a string of options help for markdown */
-  char str[NAME_MAX] = {0};
-  char outbuf[PATH_MAX] = {0};
-  int i = 0;
-  while ((nopl[i])) {
-    if (nopl[i]->action) {
-      sprintf(str, ".TP\n.B -%s, --%s\n%s %s FIXME\n",
-      nopl[i]->shortname, nopl[i]->longname, nopl[i]->dataname,
-      nopl[i]->helptext);
-      strcat(outbuf, str);
-    }  // if()
-    i++;
-  } // while()
-  char *cp = strrchr(outbuf, '\n');
-  *cp = '\0'; // don't need the last line end.
-  char *ret = xstrdup(outbuf);  // caller is to free this
-  return ret;
-
-} // genoptionshelp()
 
 char *ucstr(const char *str)
 { /* return uppercase of str */
@@ -834,7 +553,6 @@ makehelperscripts(prgvar_t *pv)
 { /* The new programs dir needs a sub dir ./bin to have helper scripts*/
   char fro[PATH_MAX] = {0};
   char to[PATH_MAX] = {0};
-  xgetcwd(fro, PATH_MAX);
   strjoin(fro, '/', "templates/", PATH_MAX);
   char *frp = fro + strlen(fro);
   strcpy(to, pv->newdir);
@@ -898,16 +616,6 @@ progidfree(progid *pi)
 } // progidfree()
 
 void
-optlist_tfree(oplist_t *ol)
-{ /* allow that any object to free may be NULL */
-  if (!ol) return;
-  if (ol->shoptname)    free(ol->shoptname);
-  if (ol->longoptname)  free(ol->longoptname);
-  if (ol->dataname)     free(ol->dataname);
-  free(ol);
-} // optlist_tfree()
-
-void
 prgvar_tfree(prgvar_t *pv)
 { /* allow that any object to free may be NULL */
   if (!pv) return;
@@ -924,14 +632,6 @@ prgvar_tfree(prgvar_t *pv)
 void
 newopt_tfree(newopt_t *no)
 { /* allow that any object to free may be NULL */
-  if (!no) return;
-  if (no->action)     free(no->action);
-  if (no->dataname)   free(no->dataname);
-  if (no->datatype)   free(no->datatype);
-  if (no->helptext)   free(no->helptext);
-  if (no->longname)   free(no->longname);
-  if (no->shortname)  free(no->shortname);
-  free(no);
 } // newopt_tfree()
 
 void
@@ -940,17 +640,6 @@ printerr(char *msg, char *var, int fatal)
   fprintf(stderr, "%s: %s\n", msg, var);
   if (fatal) exit(EXIT_FAILURE);
 } // printerr()
-
-char
-*xgetcwd(char *buf, size_t size)
-{ /* getcwd with error handling */
-  char *res = getcwd(buf, size);
-  if (!res) {
-    perror("getcwd()");
-    exit(EXIT_FAILURE);
-  }
-  return res;
-} // xgetcwd()
 
 char
 *get_today(void)
