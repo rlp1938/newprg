@@ -29,12 +29,14 @@
 #   'FIXME' appended. This should avoid "too long errors".
 #   The options descriptor may be line broken if needed.
 
-#  https://www.youtube.com/watch?v=qbkgj5J91hE&t=2046s
+# 8. function to run, may be empty, if so 'FIXME' will be substituted.
+#   Anything provided by default here should have a function provided
+#   and code should be provided in main.c in ./templates dir.
+  
+#1  2   3       4   56   7                                      8
+h,help,runhelp,flag,0,,Displays this help message then quits.,dohelp(0);
 
-#1  2   3       4   56   7
-h,help,runhelp,flag,0,,Displays this help message then quits.;
-
-#1  2       3      4  56  7
-v,version,runvsn,flag,0,,Displays program version number then quits.;
+#1  2       3      4  56  7                                         8->
+v,version,runvsn,flag,0,,Displays program version number then quits.,dovsn();
 
 
