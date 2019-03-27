@@ -85,13 +85,25 @@ static void prgvar_tfree(prgvar_t *pv);
 
 typedef struct newopt_t { /* the options to be processed in the new
                             program. */
-  char *dataname;   // Should be legal C var name, but I don't care.
-  char *datatype;   // int, double, char *
-  char *helptext;   // generated text, eg 'a flag, default 0'
-  char *action;     // C code eg '= 1;' for a flag type.
-  char *shortname;  // single char;
-  char *longname;   // the option long name.
-  char optargrqd;   // '0','1','2' no optarg, optarg, optarg optional.
+  char *shortopt; // short option char with 0-2 ':' appended.
+  char *longopt;  // long option name.
+  char *varname;  // The C variable name, purpose decides the type.
+  char *purpose;  /* Technical purpose of the option:
+                    * flag, C int. No optarg.
+                    * acc, accumulator, C int. No optarg. May set max.
+                    * int, C int, Must have optarg. Conversion done.
+                    * float, C double. Converts optarg.
+                    * string, C char*.
+                    * block, a file path.
+                  */
+  char *default;  // default value. May be 0 length, if so,
+                  // "0", "0.0", or (char*) NULL will be used.
+  char *max_val;  // If empty it will be ignored.
+  char *help_txt; /* If empty, "FIXME" will be substituted.
+                   * If the text needs to be long use a short headline
+                   * with "FIXME" appended.
+                  */ 
+  char *runfunc;  // EG dohelp(0), runvsn(). "FIXME" or empty usually.
 } newopt_t;
 
 static void newopt_tfree(newopt_t *no);
