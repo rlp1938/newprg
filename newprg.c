@@ -75,7 +75,10 @@ typedef struct prgvar_t { /* carries all vars needed to generate the
   char *newdir;     // full path to the dir of the new program
   char *linksdir;   // full path to the dir of the lib s/w to link in.
   char *stubsdir;   // full path to the dir of the lib s/w to copy in.
-  int newdirctl;    // 'n' don't delete, 'y' delete, 'q' ask.
+  char *templates;  // full path to the dir of the templates files.
+  /* The search order for named dependency files is, linksdir,
+   * stubsdir, then templates.
+   * */
 } prgvar_t;
 
 static void prgvar_tfree(prgvar_t *pv);
@@ -101,11 +104,17 @@ static char *version;
 static void dohelp(int forced);
 static void is_this_first_run(void);
 static prgvar_t *action_options(options_t *optp);
-static prgvar_t *prog_args(options_t *optp, char **argv);
-
+static char **getlibsoftwarenames(const char *path, char *nameslist);
+static char *expand_extensions(const char *list);
+static char *read_defaults(const char *path);
+static prgvar_t *prog_args(prgvar_t *pv, options_t *optp, char **argv);
+static char **getextras(const char *path, char *nameslist);
+static char **getoptionslist(const char *path, char *nameslist);
+static prgvar_t *makepaths(char **configs, prgvar_t *pv);
 static progid *makeprogname(const char *);
-static void makepaths(prgvar_t *pv);
-static void makelists(prgvar_t *pv, options_t *optp);
+static void maketargetdir(prgvar_t *pv);
+
+
 static char **csv2strs(char *longstr, char sep);
 static char *swdepends(char *optslist);
 static newopt_t **makenewoptionslist(prgvar_t *pv); // the array
@@ -120,7 +129,6 @@ static char *getoptslongname(char *optsdescriptor);
 static char getoptargrequired(char *optsdescriptor);
 static int validateoptsdescriptor(char *optsdescriptor);
 static void printerr(char *msg, char *var, int fatal);
-static void maketargetdir(prgvar_t *pv);
 static void makemain(prgvar_t *pv);
 static void placelibs(prgvar_t *pv);
 static void generatemakefile(prgvar_t *pv);
@@ -145,15 +153,16 @@ int main(int argc, char **argv)
   // data gathering
   options_t opt = process_options(argc, argv);
   prgvar_t *pv = action_options(&opt);
-  pv = prog_args(&opt, argv);
+  pv = prog_args(pv, &opt, argv);
   char **configs = loadconfigs("newprg");
+  pv = makepaths(configs, pv);
+  maketargetdir(pv);  // generate the target dir.
+  newopt_t **nopl = makenewoptionslist(pv);
+
   exit(0);
-  makepaths(pv);  // full paths to newprogram dir and source libs.
-  makelists(pv, &opt);  // space separated long strings to char **
+  //makelists(pv, &opt);  // space separated long strings to char **
   /* pv->optsout has the new options in coded form (as user input)
    * nopl has them expanded, ie ready for use. */
-  newopt_t **nopl = makenewoptionslist(pv);
-  maketargetdir(pv);  // generate the target dir.
   placelibs(pv);  // software source lib code.
   makemain(pv); // make the C source file.
   generatemakefile(pv); // convert makefile to suit the new program.
@@ -182,7 +191,7 @@ is_this_first_run(void)
 } // is_this_first_run()
 
 prgvar_t
-*prog_args(options_t *optp, char **argv)
+*prog_args(prgvar_t *pv, options_t *optp, char **argv)
 {/* Uses the global options vars, optind etc*/
   if (!argv[optind]) {
     fputs("No project name provided.\n", stderr);
@@ -191,8 +200,6 @@ prgvar_t
   char *pname = argv[optind];
   optind++;
   if (argv[optind]) printerr("Extraneous input:", argv[optind], 1);
-  prgvar_t *pv = xmalloc(sizeof(struct prgvar_t));
-  memset(pv, 0, sizeof(struct prgvar_t));
   pv->pi = makeprogname(pname);  // variations on the project name.
   return pv;
 } // prog_args()
@@ -232,57 +239,52 @@ progid
   return prid;
 } // makeprogname()
 
-void
-makepaths(prgvar_t *pv)
+prgvar_t
+*makepaths(char **configs, prgvar_t *pv)
 { /* make full paths to the new program dir, source library files to
   link into the new dir, and source lib files to be copied. */
   char buf[PATH_MAX];
-  char *home = xstrdup(getenv("HOME"));
-  // software components - to link
-  char *progdir = cfg_getparameter("newprg", "prdata.cfg",
-   "progdir");
-  char *compdir = cfg_getparameter("newprg", "prdata.cfg",
-   "compdir");
+  char *home = getenv("HOME");
   strcpy(buf, home);
-  strjoin(buf, '/', progdir, PATH_MAX);
-  strjoin(buf, '/', compdir, PATH_MAX);
-  pv->linksdir = xstrdup(buf);
-  free(compdir);  // keep progdir for next
-  // software components - to copy
-  char *stubdir = cfg_getparameter("newprg", "prdata.cfg",
-   "stubdir");
-  strcpy(buf, home);
-  strjoin(buf, '/', progdir, PATH_MAX);
-  strjoin(buf, '/', stubdir, PATH_MAX);
-  pv->stubsdir = xstrdup(buf);
-  free(stubdir);  // keep progdir
-  // path to new program dir
-  strcpy(buf, home);
-  strjoin(buf, '/', progdir, PATH_MAX);
+  char *cfg = getconfig(configs, "progdir");
+  if (cfg) {
+    strcpy(buf, home);
+    strjoin(buf, '/', cfg, PATH_MAX);
+  } else {
+    fputs("Couldn't find document root", stderr);
+    exit(EXIT_FAILURE);
+  }
+  char *docroot = xstrdup(buf);
+  strcpy(buf, docroot); // the new programs dir
   strjoin(buf, '/', pv->pi->dir, PATH_MAX);
   pv->newdir = xstrdup(buf);
-  free(home);
+  strcpy(buf, docroot); // path to linked in s/w libs.
+  cfg = getconfig(configs, "compdir");
+  strjoin(buf, '/', cfg, PATH_MAX);
+  pv->linksdir = xstrdup(buf);
+  strcpy(buf, docroot); // path to copied s/w libs.
+  cfg = getconfig(configs, "stubdir");
+  strjoin(buf, '/', cfg, PATH_MAX);
+  pv->stubsdir = xstrdup(buf);
+  strcpy(buf, docroot); // path to template files.
+  cfg = getconfig(configs, "templates");
+  strjoin(buf, '/', cfg, PATH_MAX);
+  pv->templates = xstrdup(buf);
+  free(docroot);
+  return pv;
 } // makepaths()
 
 void
-makelists(prgvar_t *pv, options_t *optp)
-{ /* with input C strings with elements separated by ' ', return
-  * string lists as char **, NULL terminated. NULL inputs may be
-  * possible and will cause NULL returns.
-  */
-  if (optp->extra_data) {
-    pv->extras = csv2strs(optp->extra_data, ' ');
-  } else pv->extras = NULL;
-  if (optp->software_deps) {
-    optp->software_deps = swdepends(optp->software_deps);
-    // expands anything having fn.x+y as the extension into fn.x, fn.y
-    pv->libswlist = csv2strs(optp->software_deps, ' ');
-  } else pv->libswlist = NULL;
-  if (optp->options_list) {
-    pv->optsout = csv2strs(optp->options_list, ' ');
-  } else pv->optsout = NULL;
-  pv->newdirctl = optp->del_target;
-} // makelists()
+maketargetdir(prgvar_t *pv)
+{ /* Make the target dir. Kill it if pre-existing. */
+  if (exists_dir(pv->newdir)) {
+    char command[PATH_MAX];
+    sprintf(command, "rm -rf %s", pv->newdir);
+    xsystem(command, 1);
+    sync();
+  }
+  newdir(pv->newdir, 0);
+} // maketargetdir()
 
 char **csv2strs(char *longstr, char sep)
 { /* break the string into shorter pieces separated by sep and return
@@ -380,10 +382,10 @@ newopt_t
   newopt_t **nopl = xmalloc((count+1) * sizeof(newopt_t *));
   int i;
   for (i = 0; i < count; i++) {
-    nopl[i] = makenewoptions(pv->optsout[i]);
+    //nopl[i] = makenewoptions(pv->optsout[i]);
   }
   return nopl;
-}
+} // makenewoptionslist()
  
 newopt_t
 *makenewoptions(char *optsdescriptor) // the struct
@@ -512,54 +514,6 @@ getoptargrequired(char *optsdescriptor)
   }
   return ret;
 } // getoptargrequired()
-
-void
-maketargetdir(prgvar_t *pv)
-{ /* Conditionally make the target dir.
-   * Non-existent, just make it.
-   * Exists, if pv->newdirctl == 'n' - error
-   *          if pv->newdirctl == 'y', delete and recreate it
-   *          if pv->newdirctl == 'q', ask what to do
-   */
-  if (exists_dir(pv->newdir)) {
-    int killit;
-    char command[PATH_MAX];
-    switch (pv->newdirctl) {
-    case 'q':
-      fputs("Dir exists, replace [Yn] ",stderr);
-      killit = getchar();
-      if (killit == 'y' || killit == 'Y') {
-        sprintf(command, "rm -rf %s", pv->newdir);
-        xsystem(command, 1);
-        sync();
-        newdir(pv->newdir, 0);
-      } else {
-        exit(EXIT_FAILURE);
-      }
-        break;
-    case 'n':
-      fprintf(stderr, "Target directory exists: %s\n", pv->newdir);
-      exit(EXIT_FAILURE);         
-        break;
-    case 'y':
-      sprintf(command, "rm -rf %s", pv->newdir);
-      xsystem(command, 1);
-      sync();
-      newdir(pv->newdir, 0);
-        break;
-    }
-  } else newdir(pv->newdir, 0);
-/*
-  char **optsout;   // list of all the options in the new program.
-  progid *pi;       // names made from the input project name.
-  char **libswlist; // source library software list.
-  char **extras;    // extradist files, eg config data files etc.
-  char *newdir;     // full path to the dir of the new program
-  char *linksdir;   // full path to the dir of the lib s/w to link in.
-  char *stubsdir;   // full path to the dir of the lib s/w to copy in.
-  int newdirctl;    // 'n' don't delete, 'y' delete, 'q' ask.
-  */
-} // maketargetdir()
 
 void
 makemain(prgvar_t *pv)
@@ -998,7 +952,8 @@ char
   return buf;
 } // get_today()
 
-void dohelp(int forced)
+void
+dohelp(int forced)
 {
   char command[PATH_MAX];
   char *dev = "./newprg.1";
@@ -1012,15 +967,121 @@ void dohelp(int forced)
   exit(forced);
 } // dohelp()
 
-prgvar_t *action_options(options_t *optp)
+prgvar_t
+*action_options(options_t *optp)
 {
 /*
 typedef struct options_t {
-	char *software_deps;  // source files to include.
-	char *extra_data;     // eg stuff like config files.
 	char *options_list;   // output options description text.
 } options_t;
 */
   if (optp->runhelp) dohelp(0);  // exits, no return;
-  
-}
+  // if (optp->runvsn) dovsn(0);  // exits, no return;
+  prgvar_t *pv = xmalloc(sizeof(struct prgvar_t));
+  pv->libswlist = getlibsoftwarenames("./defaults/lsw.dflt",
+                                        optp->software_deps);
+  pv->extras = getextras("./defaults/extra.dflt", optp->extra_data);
+  pv->optsout = getoptionslist("./defaults/options.dflt",
+                                optp->options_list);
+  return pv;
+} // action_options()
+
+char
+**getlibsoftwarenames(const char *path, char *nameslist)
+{ /* consolidate all names from defaults and/or options.
+   * either or both sources may be NULL.
+  */
+  char buf[PATH_MAX];
+  buf[0] = 0;
+  if (exists_file(path)) {
+    char *dfp = read_defaults(path);
+    strjoin(buf, ' ', dfp, PATH_MAX);
+  }
+  if (nameslist) strjoin(buf, ' ', nameslist, PATH_MAX);
+  if (!(strlen(buf))) return (char**)NULL; 
+  char *expanded = expand_extensions(buf);
+  char **swlist = list2array(expanded, " ");
+  free(expanded);
+  return swlist;
+} // getlibsoftwarenames()
+
+char
+*expand_extensions(const char *list)
+{ /* some filenames may look like example.h+c as shorthand for
+   * example.h and example.c. This expands any such shorthand into
+   * the named pairs of files.
+  */
+  char inbuf[PATH_MAX]; // I know that list is < PATH_MAX
+  const int twoby = PATH_MAX * 2;
+  char outbuf[2 * PATH_MAX];
+  outbuf[0] = 0;  // strjoin demands this.
+  strcpy (inbuf, list);
+  char *cp = inbuf;
+  while (*cp) {
+    char name[FILENAME_MAX];
+    char *ep = strchr(cp, ' ');
+    if (ep) *ep = 0;  // the last word is already terminated by 0.
+    strcpy(name, cp);
+    char *exp = strrchr(name, '+'); // shorthand naming?
+    if (exp) {
+      *exp = 0;
+      strjoin(outbuf, ' ', name, twoby);  // first named file
+      *(exp-1) = *(exp+1);  // prepare second named file
+    }
+    strjoin(outbuf, ' ', name, twoby);
+    cp += strlen(cp) + 1;
+  } // while()
+  return xstrdup(outbuf);
+} // expand_extensions()
+
+char
+*read_defaults(const char *path)
+{ /* read the named path, get rid of comments, and return a space
+   * separated list of non-zero length strings.
+  */
+  char buf[PATH_MAX];
+  buf[0] = 0; // strjoin requires this.
+  mdata *md = readfile(path, 0, 1);
+  stripcomment(md, "#", "\n", 0);
+  char **strlist = mdatatostringlist(md);
+  size_t idx = 0;
+  while (strlist[idx]) {
+    strjoin(buf, ' ', strlist[idx], PATH_MAX);
+    idx++;
+  }
+  freestringlist(strlist, 0);
+  free_mdata(md);
+  return xstrdup(buf);
+} // read_defaults()
+
+char
+**getextras(const char *path, char *nameslist)
+{ 
+  char buf[PATH_MAX];
+  buf[0] = 0;
+  if (exists_file(path)) {
+    char *dfp = read_defaults(path);
+    strjoin(buf, ' ', dfp, PATH_MAX);
+  }
+  if (nameslist) strjoin(buf, ' ', nameslist, PATH_MAX);
+  if (!(strlen(buf))) return (char**)NULL; 
+  char **extralist = list2array(buf, " ");
+  return extralist;
+} // getextras()
+
+char
+**getoptionslist(const char *path, char *nameslist)
+{ /* consolidate all names from defaults and/or options.
+   * either or both sources may be NULL.
+  */
+  char buf[PATH_MAX];
+  buf[0] = 0;
+  if (exists_file(path)) {
+    char *dfp = read_defaults(path);
+    strjoin(buf, ' ', dfp, PATH_MAX);
+  }
+  if (nameslist) strjoin(buf, ' ', nameslist, PATH_MAX);
+  if (!(strlen(buf))) return (char**)NULL; 
+  char **optionslist = list2array(buf, "; ");
+  return optionslist;
+} // getoptionslist()
