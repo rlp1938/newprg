@@ -132,6 +132,9 @@ mdata
 *append_eol(mdata *md);
 
 char
-*getconfig(const char **configs, char *cfgname);
+*getconfig(char **configs, char *cfgname);
+
+char
+*dictionary(char **list, char *key);
 
 #endif

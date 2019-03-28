@@ -571,7 +571,7 @@ mdata
 } // append_eol()
 
 char
-*getconfig(const char **configs, char *cfgname)
+*getconfig(char **configs, char *cfgname)
 { /* configs is an array of strings of form key=data, NULL terminated.
     * returns data if found, other wise NULL.
   */
@@ -593,3 +593,20 @@ char
   return (char *)NULL;
 } // getconfig()
 
+char
+*dictionary(char **list, char *key)
+{ /* List must be NULL terminated. Returns NULL if key not found. */
+  size_t i;
+  char *ret = NULL;
+  static char buf[PATH_MAX];
+  for (i = 0; list[i]; i++) {
+    strcpy(buf, list[i]);
+    char *eq = strchr(buf, '=');
+    *eq = 0;
+    if (strcmp(key, buf) == 0) {
+      ret = eq + 1;
+      break;
+    } // if()
+  } // for()
+  return ret;
+} // dictionary()
