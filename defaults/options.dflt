@@ -14,7 +14,7 @@
 #   by purpose.
 
 # 4. purpose, this must be one of flag, accumulator, int, float,
-#   string, block. Flag and accumulator may not have an optional
+#   string, file. Flag and accumulator may not have an optional
 #   argument and the others must have one. The arithmetic types are
 #   converted. The string types are built on the heap and must be
 #   freed after use.
