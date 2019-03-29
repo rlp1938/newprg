@@ -39,4 +39,12 @@ h,help,runhelp,flag,0,,Displays this help message then quits.,dohelp(0);
 #1  2       3      4  56  7                                         8->
 v,version,runvsn,flag,0,,Displays program version number then quits.,dovsn();
 
+b,bullshit,nonesense,acc,,3,Controls how much bullshit is output,; #2
 
+c:,crap,rubbish,float,,,Just floats away.,; #3
+
+s:,sentence,strvar,string,,,String it out.,; #4
+
+i:,number,ival,int,,,Gimme a number between 1 and 10,; #5
+
+f:,file,path,file,,,Path to file,; #6
