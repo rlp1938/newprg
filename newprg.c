@@ -110,7 +110,12 @@ static prgvar_t *makepaths(char **configs, prgvar_t *pv);
 static progid *makeprogname(const char *);
 static void maketargetdir(prgvar_t *pv);
 static newopt_t **makenewoptionslist(prgvar_t *pv); // the array
-static newopt_t *makenewoptions(char *optsdescriptor);  // the struct
+static newopt_t *makenewoption(char *optsdescriptor);  // the struct
+static int validateoptsdescriptor(char *optsdescriptor);
+static int validshortname(char *buf);
+static int validlongname(char *buf);
+static int validpurpose(char *buf);
+static char *getdflt(char *purpose);
 
 
 
@@ -122,7 +127,6 @@ static char *getCaction(int idx);
 static char *getoptshortname(char *optsdescriptor);
 static char *getoptslongname(char *optsdescriptor);
 static char getoptargrequired(char *optsdescriptor);
-static int validateoptsdescriptor(char *optsdescriptor);
 static void printerr(char *msg, char *var, int fatal);
 static void makemain(prgvar_t *pv);
 static void placelibs(prgvar_t *pv);
@@ -147,12 +151,15 @@ int main(int argc, char **argv)
   pv = makepaths(configs, pv);
   maketargetdir(pv);  // generate the target dir.
   newopt_t **nopl = makenewoptionslist(pv);
-
+  placelibs(pv);  // software source lib code.
   exit(0);
+
+
+  
   //makelists(pv, &opt);  // space separated long strings to char **
   /* pv->optsout has the new options in coded form (as user input)
    * nopl has them expanded, ie ready for use. */
-  placelibs(pv);  // software source lib code.
+  
   makemain(pv); // make the C source file.
   generatemakefile(pv); // convert makefile to suit the new program.
   addautotools(pv); // Create GNU file requirment
@@ -282,34 +289,210 @@ newopt_t
   newopt_t **nopl = xmalloc((count+1) * sizeof(newopt_t *));
   int i;
   for (i = 0; i < count; i++) {
-    //nopl[i] = makenewoptions(pv->optsout[i]);
+    nopl[i] = makenewoption(pv->optsout[i]);
   }
   return nopl;
 } // makenewoptionslist()
  
 newopt_t
-*makenewoptions(char *optsdescriptor) // the struct
+*makenewoption(char *optsdescriptor) // the struct
 { /* */
-  int hasoptsdataname = validateoptsdescriptor(optsdescriptor);
+  validateoptsdescriptor(optsdescriptor); // exits on error.
   newopt_t *nop = xmalloc(sizeof(newopt_t));
-  
-  
+  char buf[PATH_MAX];
+  char objbuf[NAME_MAX];
+  strcpy(buf, optsdescriptor);  // protect the source.
+  char *obj = buf;  // field # 1, short option name.
+  char *comma = obj;
+  while (*comma != ',') comma++;
+  *comma = 0;
+  strcpy(objbuf, obj);
+  if (validshortname(objbuf)) nop->shortopt = xstrdup(objbuf);
+  obj = comma + 1;  // field # 2, long option name.
+  while (*comma != ',') comma++;
+  *comma = 0;
+  strcpy(objbuf, obj);
+  if (validlongname(objbuf)) nop->longopt = xstrdup(objbuf);
+  obj = comma + 1;  // field # 3, option variable name.
+  while (*comma != ',') comma++;
+  *comma = 0;
+  strcpy(objbuf, obj);
+  if (strlen(objbuf)) nop->varname = xstrdup(objbuf);
+    else nop->varname = "FIXME";
+  obj = comma + 1;  // field # 4, purpose.
+  while (*comma != ',') comma++;
+  *comma = 0;
+  strcpy(objbuf, obj);
+  if (validpurpose(objbuf)) nop->purpose = xstrdup(objbuf);
+  obj = comma + 1;  // field # 5, dflt_val.
+  while (*comma != ',') comma++;
+  *comma = 0;
+  strcpy(objbuf, obj);
+  if (strlen(objbuf)) nop->dflt_val = xstrdup(objbuf);
+    else nop->dflt_val = getdflt(nop->purpose);
+  obj = comma + 1;  // field # 6, max_val.
+  while (*comma != ',') comma++;
+  *comma = 0;
+  strcpy(objbuf, obj);
+  if (strlen(objbuf)) nop->max_val = xstrdup(objbuf);
+    else nop->max_val = (char*)NULL;
+  obj = comma + 1;  // field # 7, help_txt.
+  while (*comma != ',') comma++;
+  *comma = 0;
+  strcpy(objbuf, obj);
+  if (strlen(objbuf)) nop->help_txt = xstrdup(objbuf);
+    else nop->help_txt = xstrdup("FIXME");
+  obj = comma + 1;  // field # 8, runfunc.
+  strcpy(objbuf, obj);
+  if (strlen(objbuf)) nop->runfunc = xstrdup(objbuf);
+    else nop->runfunc = xstrdup("FIXME");
   return nop;
-} // makenewoptions()
+} // makenewoption()
 
 int
 validateoptsdescriptor(char *optsdescriptor)
-{ /* The optsdescriptor must contain or terminate with ';'
-   * If there is nothing after ';' then some fields of newopt_t
-   * will be left NULL/0 when setting up this struct.
+{ /* The optsdescriptor has 8 fields, comma separated.
+   * So there must be 7 commas, more or fewer is an error.
   */
-  char *cp = strchr(optsdescriptor, ';');
-  if (!cp) printerr("Malformed options descriptor", optsdescriptor, 1);
-  int ret;
-  cp++; // what comes next
-  if (*cp == 0) ret = 0; else ret = 1;
-  return ret;
+  size_t i;
+  size_t count = 0;
+  for (i = 0; optsdescriptor[i]; i++) {
+    if (optsdescriptor[i] == ',') count++;
+  }
+  if (count != 7) {
+    fprintf(stderr, "Option descriptor string must have 7 commas.\n"
+                    "%s\n", optsdescriptor);
+    exit(EXIT_FAILURE);
+  }
+  // Can have a terminal ';' on the last item of a list. Get rid of it.
+  char *sc = strrchr(optsdescriptor, ';');
+  if (sc) *sc = 0;
+  return 1; // didn't fail count test.
 } // validateoptsdescriptor()
+
+int
+validshortname(char *buf)
+{ /* a valid shortname is 1,2 or 3 chars long
+   * buf[0] must be alpha or a number.
+   * buf[1] and buf[2] must be == ':' if they exist.
+  */
+  int yes;
+  size_t len = strlen(buf);
+  if (len > 0 && len < 4) yes = 1; else yes = 0;
+  if ((yes) && isalnum(buf[0])) yes = 1; else yes = 0;
+  switch(len) {
+    case 2:
+      if ((yes) && buf[1] == ':') yes = 1; else yes = 0;
+    break;
+    case 3:
+      if ((yes) && buf[1] == ':' && buf[2] == ':') yes = 1;
+      else yes = 0;
+    break;
+  } // switch()
+  if (yes) return yes;
+  fprintf(stderr, "Malformed short option specifier: %s\n", buf);
+  exit(EXIT_FAILURE);
+} // validshortname()
+
+int
+validlongname(char *buf)
+{ /* Must be > 1 char long and all chars are to be isalnum() */
+  size_t len = strlen(buf);
+  int res;
+  if (len > 1) res = 1; else res = 0;
+  if (res) {
+    size_t i;
+    for (i = 0; i < len; i++) {
+      if (!isalnum(buf[i])) res = 0;
+    } // for()
+  } // if()
+  if (res) {
+    return 1;
+  } else {
+    fprintf(stderr, "Invalid option long name: %s\n", buf);
+    exit(EXIT_FAILURE);
+  }
+} // validlongname()
+
+int
+validpurpose(char *buf)
+{ /* must be in a list, if not abort */
+  char *list[7] = { "flag","acc","int","float", "string", "file",
+                    NULL };
+  char *ret = instrlist(buf, list);
+  if (!ret) {
+    fprintf(stderr, "Purpose, not in list:\n");
+    size_t i;
+    for (i = 0; list[i]; i++) {
+      fprintf(stderr, "%s, ", list[i]);
+    }
+    fputs("\n", stderr);
+    exit(EXIT_FAILURE);
+  } // if()
+  return 1;
+} // validpurpose()
+
+char
+*getdflt(char *purpose)
+{ /* do a dictionary lookup to find the default zero value. */
+  char *list[] = { "flag=0", "acc=0", "int=0", "float=0.0",
+                  "string=(char*)NULL", "file=(char*)NULL", NULL};
+  static char buf[PATH_MAX];
+  char *cp = dictionary(list, purpose);
+  if (!cp) {
+    fprintf(stderr, "Invalid option purpose: %s\n", purpose);
+    exit(EXIT_FAILURE);
+  }
+  strcpy(buf, cp);
+  return buf;
+} // getdflt()
+
+void placelibs(prgvar_t *pv)
+{ /* Link source libraries (linksdir), copy the same as needed
+   * (stubsdir), copy gopt.? ./templates from ./, or print warning
+   *  messages as needed.
+  */
+  int count = 0;
+  while (pv->libswlist[count]) count++;
+  int *ilist = xmalloc(count * sizeof(int));
+  int i;
+  for (i = 0; i < count; i++) ilist[i] = 1;
+  char frbuf[PATH_MAX], tobuf[PATH_MAX];
+  for (i = 0; i < count; i++) { // to be linked
+    sprintf(frbuf, "%s/%s", pv->linksdir, pv->libswlist[i]);
+    sprintf(tobuf, "%s/%s", pv->newdir, pv->libswlist[i]);
+    int res = link(frbuf, tobuf); // may not succeed
+    if (res == 0) ilist[i] = 0; // success.
+  }
+  for (i = 0; i < count; i++) { // to be copied
+    if (ilist[i]) {
+      sprintf(frbuf, "%s/%s", pv->stubsdir, pv->libswlist[i]);
+      sprintf(tobuf, "%s/%s", pv->newdir, pv->libswlist[i]);
+      if (exists_file(frbuf)) { // the file does not have to exist
+        copyfile(frbuf, tobuf);
+        ilist[i] = 0;
+      }
+    }
+  } // for()
+  for (i = 0; i < count; i++) { // gopt.c|h from templates dir
+    if (ilist[i]) {
+      sprintf(frbuf, "%s/%s", "./templates", pv->libswlist[i]);
+      sprintf(tobuf, "%s/%s", pv->newdir, pv->libswlist[i]);
+      if (exists_file(frbuf)) { // the file does not have to exist
+        copyfile(frbuf, tobuf);
+        ilist[i] = 0;
+      }
+    }
+  } // for()
+  for (i = 0; i < count; i++) { // dependencies for the makefile.
+    if (ilist[i]) {
+      fprintf(stderr, "File: %s does not exist.\n", pv->libswlist[i]);
+    }
+  } // for()
+} // placelibs()
+
+
+
 
 int
 get_types_index(char *optsdescriptor)
@@ -409,50 +592,6 @@ makemain(prgvar_t *pv)
   writefile(buf, md->fro, md->to, "w");
   free_mdata(md);
 } // makemain()
-
-void placelibs(prgvar_t *pv)
-{ /* Link source libraries (linksdir), copy the same as needed
-   * (stubsdir), copy gopt.? ./templates from ./, or print warning
-   *  messages as needed.
-  */
-  int count = 0;
-  while (pv->libswlist[count]) count++;
-  int *ilist = xmalloc(count * sizeof(int));
-  int i;
-  for (i = 0; i < count; i++) ilist[i] = 1;
-  char frbuf[PATH_MAX], tobuf[PATH_MAX];
-  for (i = 0; i < count; i++) { // to be linked
-    sprintf(frbuf, "%s/%s", pv->linksdir, pv->libswlist[i]);
-    sprintf(tobuf, "%s/%s", pv->newdir, pv->libswlist[i]);
-    int res = link(frbuf, tobuf); // may not succeed
-    if (res == 0) ilist[i] = 0; // success.
-  }
-  for (i = 0; i < count; i++) { // to be copied
-    if (ilist[i]) {
-      sprintf(frbuf, "%s/%s", pv->stubsdir, pv->libswlist[i]);
-      sprintf(tobuf, "%s/%s", pv->newdir, pv->libswlist[i]);
-      if (exists_file(frbuf)) { // the file does not have to exist
-        copyfile(frbuf, tobuf);
-        ilist[i] = 0;
-      }
-    }
-  } // for()
-  for (i = 0; i < count; i++) { // gopt.c|h from templates dir
-    if (ilist[i]) {
-      sprintf(frbuf, "%s/%s", "./templates", pv->libswlist[i]);
-      sprintf(tobuf, "%s/%s", pv->newdir, pv->libswlist[i]);
-      if (exists_file(frbuf)) { // the file does not have to exist
-        copyfile(frbuf, tobuf);
-        ilist[i] = 0;
-      }
-    }
-  } // for()
-  for (i = 0; i < count; i++) { // dependencies for the makefile.
-    if (ilist[i]) {
-      fprintf(stderr, "File: %s does not exist.\n", pv->libswlist[i]);
-    }
-  } // for()
-} // placelibs()
 
 void
 generatemakefile(prgvar_t *pv)
