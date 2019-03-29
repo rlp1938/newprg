@@ -5,3 +5,5 @@ files.c+h
 dirs.h+c
 firstrun.c+h
 gopt.h+c
+# files below don't exist
+nofile.c+h
