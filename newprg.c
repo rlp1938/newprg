@@ -116,7 +116,13 @@ static int validshortname(char *buf);
 static int validlongname(char *buf);
 static int validpurpose(char *buf);
 static char *getdflt(char *purpose);
-
+static void maketargetoptions(prgvar_t *pv, newopt_t **nopl);
+static void maketoheader(prgvar_t *pv, newopt_t **nopl);
+static void maketoCfile(prgvar_t *pv, newopt_t **nopl);
+static mdata *gettargetfile(prgvar_t *pv, const char *fn);
+static void setfileownertext(prgvar_t *pv, mdata *md);
+static char *settargetfilename(prgvar_t *pv, const char *fn);
+static char *purposetoCtype(const char *purpose);
 
 
 
@@ -151,7 +157,8 @@ int main(int argc, char **argv)
   pv = makepaths(configs, pv);
   maketargetdir(pv);  // generate the target dir.
   newopt_t **nopl = makenewoptionslist(pv);
-  placelibs(pv);  // software source lib code.
+  placelibs(pv);  // software source library code.
+  maketargetoptions(pv, nopl);
   exit(0);
 
 
@@ -490,6 +497,77 @@ void placelibs(prgvar_t *pv)
     }
   } // for()
 } // placelibs()
+
+void
+maketargetoptions(prgvar_t *pv, newopt_t **nopl)
+{ /* make the gopt.c+h for the target program.*/
+  maketoheader(pv, nopl);
+  maketoCfile(pv, nopl);
+} // maketargetoptions()
+
+void
+maketoheader(prgvar_t *pv, newopt_t **nopl)
+{ /* generates the options_t struct */
+  mdata *md = gettargetfile(pv, "gopt.h");
+  setfileownertext(pv, md);
+  char buf[PATH_MAX];
+  buf[0] = 0;
+  size_t i;
+  for (i = 0; nopl[i]; i++) {
+    char *purpose = nopl[i]->purpose;
+    char *ctype = purposetoCtype(purpose);
+    char *vname = nopl[i]->varname;
+    char *cmnt = nopl[i]->runfunc;
+    char line[NAME_MAX];
+    sprintf(line, "\t%s\t%s\t// %s, %s", ctype, vname, purpose, cmnt);
+    strjoin(buf, '\n', line, PATH_MAX);
+  }
+  memreplace(md, "<struct>", buf, PATH_MAX);
+  char *path = settargetfilename(pv, "gopt.h");
+  writefile(path, md->fro, md->to, "w" );
+  free_mdata(md);
+} // maketoheader()
+
+void
+maketoCfile(prgvar_t *pv, newopt_t **nopl)
+{
+} // maketoCfile()
+
+mdata *gettargetfile(prgvar_t *pv, const char *fn)
+{ /* readfile to take care of errors. */
+  char *path = settargetfilename(pv, fn);
+  mdata *md = readfile(path, 0, 1);
+  return md;
+} // gettargetfile()
+
+void
+setfileownertext(prgvar_t *pv, mdata *md)
+{ /* Writes the copyright ownership text near the top of a file. */
+  char buf[NAME_MAX];
+  time_t now = time(NULL);
+  struct tm *lt = localtime(&now);
+  int yy = lt->tm_year + 1900;
+  sprintf(buf, "%d %s %s", yy, pv->pi->author, pv->pi->email);
+  memreplace(md, "<file owner>", buf, NAME_MAX);
+} // setfileownertext()
+
+char
+*settargetfilename(prgvar_t *pv, const char *fn)
+{
+  static char path[PATH_MAX];
+  strcpy(path, pv->newdir);
+  strjoin(path, '/', fn, PATH_MAX);
+  return path;
+} // settargetfilename()
+
+char
+*purposetoCtype(const char *purpose)
+{
+  char *list[7] = { "flag=int", "acc=int", "int=int", "float=double",
+    "string=char*", "file=char*", NULL };
+    return dictionary(list, purpose);
+} // purposetoCtype()
+
 
 
 
