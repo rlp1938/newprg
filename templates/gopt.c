@@ -1,6 +1,6 @@
 /*      gopt.c
  *
- *  Copyright 2019 Robert L (Bob) Parker rlp1938@gmail.com
+ *  Copyright <file owner> 
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -24,31 +24,19 @@
 
 options_t process_options(int argc, char **argv)
 {
-  optstring = ":hd:x:n:";  // initialise
+  optstring = "<optstring>";  // initialise
 
-  options_t opts;
-  opts.runhelp         = 0;
-  opts.software_deps  = NULL;
-  opts.extra_data     = NULL;
-  opts.options_list   = NULL;
+  options_t opts = {0}; // will clang bitch?
+  // add any non-zero, non-NULL default values.
+<defaults>
 
   int c;
-  const int max = PATH_MAX;
-  char joinbuffer[PATH_MAX];    // collects list of extra software.
-  joinbuffer[0] = 0;
-  char databuffer[PATH_MAX];    // collects list of other data.
-  databuffer[0] = 0;
-  char optionsbuffer[PATH_MAX]; // collects list of options codes.
-  optionsbuffer[0] = 0;
 
   while(1) {
     int this_option_optind = optind ? optind : 1;
     int option_index = 0;
     static struct option long_options[] = {
-    {"help",          0,  0,  'h' },
-    {"depends",       1,  0,  'd' },
-    {"extra-dist",    1,  0,  'x' },
-    {"options-list",  1,  0,  'n' },
+<longopt>
     {0,  0,  0,  0 }
     };
 
@@ -63,18 +51,7 @@ options_t process_options(int argc, char **argv)
       switch (option_index) {
       } // switch()
     break;
-    case 'h':
-      opts.runhelp = 1;
-    break;
-    case 'd':  // output software dependencies for Makefile.am
-      strjoin(joinbuffer, ' ',optarg, max);
-    break;
-    case 'n':  // output options descriptor strings.
-      strjoin(optionsbuffer, ' ', optarg, max);
-    break;
-    case 'x':  // other data for Makefile.am
-      strjoin(databuffer, ' ',optarg, max);
-    break;
+<functions>    
     case ':':
       fprintf(stderr, "Option %s requires an argument\n",
           argv[this_option_optind]);
@@ -87,15 +64,6 @@ options_t process_options(int argc, char **argv)
     break;
     } // switch()
   } // while()
-  if (strlen(joinbuffer)) {
-    opts.software_deps = xstrdup(joinbuffer);
-  }
-  if (strlen(databuffer)) {
-    opts.extra_data = xstrdup(databuffer);
-  }
-  if (strlen(optionsbuffer)) {
-    opts.options_list = xstrdup(optionsbuffer);    
-  }
   return opts;
 } // process_options()
 
