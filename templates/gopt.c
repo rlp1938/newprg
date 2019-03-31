@@ -51,7 +51,7 @@ options_t process_options(int argc, char **argv)
       switch (option_index) {
       } // switch()
     break;
-<functions>    
+<cases>    
     case ':':
       fprintf(stderr, "Option %s requires an argument\n",
           argv[this_option_optind]);
