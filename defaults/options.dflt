@@ -41,7 +41,7 @@ v,version,runvsn,flag,0,,Displays program version number then quits.,dovsn();
 
 b,bullshit,nosense,acc,,3,Controls how much bullshit is output,; #2
 
-c:,crap,rubbish,float,,,Just floats away.,; #3
+c:,crap,rubbish,float,3.14159,,Just floats away.,; #3
 
 s:,sentence,strvar,string,,,String it out.,; #4
 
