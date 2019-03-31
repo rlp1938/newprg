@@ -123,7 +123,11 @@ static mdata *gettargetfile(prgvar_t *pv, const char *fn);
 static void setfileownertext(prgvar_t *pv, mdata *md);
 static char *settargetfilename(prgvar_t *pv, const char *fn);
 static char *purposetoCtype(const char *purpose);
-
+static char *buildoptstring(newopt_t **nopl);
+static char *builddefaults(newopt_t **nopl);
+static char *buildlongopts(newopt_t **nopl);
+static char *buildcases(newopt_t **nopl);
+static char *getoptrval(const char *purpose);
 
 
 static int get_types_index(char *optsdescriptor);
@@ -426,7 +430,7 @@ validpurpose(char *buf)
 { /* must be in a list, if not abort */
   char *list[7] = { "flag","acc","int","float", "string", "file",
                     NULL };
-  char *ret = instrlist(buf, list);
+  int ret = instrlist(buf, list);
   if (!ret) {
     fprintf(stderr, "Purpose, not in list:\n");
     size_t i;
@@ -530,10 +534,111 @@ maketoheader(prgvar_t *pv, newopt_t **nopl)
 
 void
 maketoCfile(prgvar_t *pv, newopt_t **nopl)
-{
+{ /* Deals with <file owner>, <optstring>, <longopt>, and
+   * <cases>, in template file.
+  * */
+  mdata *md = gettargetfile(pv, "gopt.c");
+  setfileownertext(pv, md);
+  char *cp = buildoptstring(nopl);
+  memreplace(md, "<optstring>", cp, NAME_MAX);
+  cp = builddefaults(nopl);
+  if (cp) {
+    memreplace(md, "<defaults>", cp, PATH_MAX);
+  } else memdel(md, "<defaults>");
+  cp = buildlongopts(nopl);
+  if (cp) memreplace(md, "<longopt>", cp, PATH_MAX);
+  cp = buildcases(nopl);
+  if (cp) memreplace(md, "<cases>", cp, PATH_MAX);
+  char *path = settargetfilename(pv, "gopt.c");
+  writefile(path, md->fro, md->to, "w" );
+  free_mdata(md);
 } // maketoCfile()
 
-mdata *gettargetfile(prgvar_t *pv, const char *fn)
+char *buildoptstring(newopt_t **nopl)
+{
+  static char buf[PATH_MAX];
+  strcpy(buf, ":");
+  size_t i;
+  for (i = 0; nopl[i]; i++) {
+    strcat(buf, nopl[i]->shortopt);
+  } // for()
+  return buf;
+} // buildoptstring()
+
+char
+*builddefaults(newopt_t **nopl)
+{ /* Deals with presence or absence of non-zero default values. */
+  static char buf[PATH_MAX];
+  buf[0] = 0;
+  size_t i;
+  for (i = 0; nopl[i]; i++) {
+    char *cp = nopl[i]->dflt_val;
+    if (strcmp(cp, "0") == 0) continue;
+    if (strcmp(cp, "0.0") == 0) continue;
+    if (strstr(cp, "NULL")) continue;
+    char name[NAME_MAX];
+    sprintf(name, "\topts.%s = %s;\n", nopl[i]->varname, cp);
+    strcat(buf, name);
+  } // for()
+  if (strlen(buf)) return buf; else return (char*)NULL;
+} // builddefaults()
+
+char
+*buildlongopts(newopt_t **nopl)
+{
+  static char buf[PATH_MAX];
+  buf[0] = 0;
+  size_t i;
+  for (i = 0; nopl[i]; i++) {
+    char *cp = nopl[i]->longopt;
+    char *sp = nopl[i]->shortopt;
+    int colon = 0;
+    if (strstr(sp, "::")) colon = 2;
+    else if (strstr(sp, ":")) colon = 1;
+    char name[NAME_MAX];
+    sprintf(name, "\t\t{\"%s\",\t%d,\t0,\t\'%c\' },",
+              cp, colon, sp[0]);
+    strjoin(buf, '\n', name, PATH_MAX);
+  } // for()
+  return buf;
+} // buildlongopts()
+
+char
+*buildcases(newopt_t **nopl)
+{
+  static char buf[PATH_MAX];
+  buf[0] = 0;
+  size_t i;
+  for (i = 0; nopl[i]; i++) {
+    char *so = nopl[i]->shortopt;
+    char *vn = nopl[i]->varname;
+    char *rv = getoptrval(nopl[i]->purpose);
+    char name[NAME_MAX];
+    sprintf(name, "\t\tcase \'%c\':\n\t\t\topts.%s = %s;",
+              so[0], vn, rv);
+    strjoin(buf, '\n', name, PATH_MAX);
+    // to deal with maxval later
+    strjoin(buf, '\n', "\t\tbreak;", PATH_MAX);
+  } // for()
+  return buf;
+} // buildcases()
+
+char
+*getoptrval(const char *purpose)
+{ /* From options purpose, return the value to the varname. */
+  char *list[7] = {
+    "flag= 1",
+    "acc= 1",
+    "int= atol(argv, NULL, 10)",
+    "float= atod(argv, NULL)",
+    "string= xstrdup(argv)",
+    "file= xstrdup(argv)",
+    NULL
+  };
+  return dictionary(list, purpose);
+} // getoptrval()
+mdata
+*gettargetfile(prgvar_t *pv, const char *fn)
 { /* readfile to take care of errors. */
   char *path = settargetfilename(pv, fn);
   mdata *md = readfile(path, 0, 1);
