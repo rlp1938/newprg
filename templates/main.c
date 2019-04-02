@@ -1,7 +1,7 @@
 /*
  * <exename>.c
  * 
- * Copyright <when> <author> <email>
+ * Copyright <file owner>
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -91,7 +91,7 @@ is_this_first_run(void)
   if (!checkfirstrun("<exename>", names)) {
     firstrun("<exename>", names);
     fprintf(stderr,
-          "Please edit <exename>.cfg in %s/.config/exename"
+          "Please edit <exename>.cfg in %s/.config/<exename>"
           " to meet your needs.\n",
           getenv("HOME"));
     exit(EXIT_SUCCESS);

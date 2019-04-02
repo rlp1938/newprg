@@ -128,6 +128,10 @@ static char *builddefaults(newopt_t **nopl);
 static char *buildlongopts(newopt_t **nopl);
 static char *buildcases(newopt_t **nopl);
 static char *getoptrval(const char *purpose);
+static void placelibs(prgvar_t *pv);
+static void makemain(prgvar_t *pv);
+
+
 
 
 static int get_types_index(char *optsdescriptor);
@@ -138,8 +142,6 @@ static char *getoptshortname(char *optsdescriptor);
 static char *getoptslongname(char *optsdescriptor);
 static char getoptargrequired(char *optsdescriptor);
 static void printerr(char *msg, char *var, int fatal);
-static void makemain(prgvar_t *pv);
-static void placelibs(prgvar_t *pv);
 static void generatemakefile(prgvar_t *pv);
 static void addautotools(prgvar_t *pv);
 
@@ -163,6 +165,8 @@ int main(int argc, char **argv)
   newopt_t **nopl = makenewoptionslist(pv);
   placelibs(pv);  // software source library code.
   maketargetoptions(pv, nopl);
+  makemain(pv); // make the C source file.
+
   exit(0);
 
 
@@ -171,7 +175,6 @@ int main(int argc, char **argv)
   /* pv->optsout has the new options in coded form (as user input)
    * nopl has them expanded, ie ready for use. */
   
-  makemain(pv); // make the C source file.
   generatemakefile(pv); // convert makefile to suit the new program.
   addautotools(pv); // Create GNU file requirment
 
@@ -637,6 +640,7 @@ char
   };
   return dictionary(list, purpose);
 } // getoptrval()
+
 mdata
 *gettargetfile(prgvar_t *pv, const char *fn)
 { /* readfile to take care of errors. */
@@ -673,6 +677,19 @@ char
     return dictionary(list, purpose);
 } // purposetoCtype()
 
+void
+makemain(prgvar_t *pv)
+{ /*  Copy main.c template to source file name and fill in targets. */
+  char *pathto = settargetfilename(pv, pv->pi->src);
+  copyfile("./templates/main.c", pathto);
+  mdata *md = gettargetfile(pv, pv->pi->src);
+  setfileownertext(pv, md);
+  memreplace(md, "<exename>", pv->pi->exe, NAME_MAX);
+
+  char *path = settargetfilename(pv, pv->pi->src);
+  writefile(path, md->fro, md->to, "w" );
+  free_mdata(md);
+} // makemain()
 
 
 
@@ -762,19 +779,6 @@ getoptargrequired(char *optsdescriptor)
   return ret;
 } // getoptargrequired()
 
-void
-makemain(prgvar_t *pv)
-{ /* open the main template and write the named C program using it. */
-  mdata *md = readfile("./templates/main.c", 1, 1024);
-  memreplace(md, "<prname>", pv->pi->exe, 1024);  // program name
-  char buf[PATH_MAX];
-  // TODO compute the year for copyright
-  sprintf(buf, "Copyright 2018 %s %s", pv->pi->author, pv->pi->email);
-  memreplace(md, "<copyright>", buf, 1024); // author, email
-  sprintf(buf, "%s/%s", pv->newdir, pv->pi->src); // target C file.
-  writefile(buf, md->fro, md->to, "w");
-  free_mdata(md);
-} // makemain()
 
 void
 generatemakefile(prgvar_t *pv)
