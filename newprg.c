@@ -130,7 +130,7 @@ static char *buildcases(newopt_t **nopl);
 static char *getoptrval(const char *purpose);
 static void placelibs(prgvar_t *pv);
 static void makemain(prgvar_t *pv);
-
+static void ulstr(int, char *);
 
 static void printerr(char *msg, char *var, int fatal);
 static void generatemakefile(prgvar_t *pv);
@@ -139,7 +139,7 @@ static void addautotools(prgvar_t *pv);
 
 
 static void makehelperscripts(prgvar_t *pv);
-static void ulstr(int, char *);
+
 
 int main(int argc, char **argv)
 {  /* newprogram - write the initial files for a new C program. */
