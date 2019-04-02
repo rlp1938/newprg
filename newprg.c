@@ -132,22 +132,12 @@ static void placelibs(prgvar_t *pv);
 static void makemain(prgvar_t *pv);
 
 
-
-
-static int get_types_index(char *optsdescriptor);
-static char *getCdatatype(int idx);
-static char *gethelptext(int idx);
-static char *getCaction(int idx);
-static char *getoptshortname(char *optsdescriptor);
-static char *getoptslongname(char *optsdescriptor);
-static char getoptargrequired(char *optsdescriptor);
 static void printerr(char *msg, char *var, int fatal);
 static void generatemakefile(prgvar_t *pv);
 static void addautotools(prgvar_t *pv);
 
 
-static char *ucstr(const char *str);
-static char *get_today(void);
+
 static void makehelperscripts(prgvar_t *pv);
 static void ulstr(int, char *);
 
@@ -691,95 +681,6 @@ makemain(prgvar_t *pv)
   free_mdata(md);
 } // makemain()
 
-
-
-
-int
-get_types_index(char *optsdescriptor)
-{/* find what the type is in 'afnsd' */
-  char *cp = strchr(optsdescriptor, ';');
-  cp += 1;
-  char t = *cp;
-  char *begin = "afnsd";
-  cp = strchr(begin, t);
-  if (!cp) printerr("The option type must be in 'afnsd'",
-                      optsdescriptor, 1);
-  int ret = cp - begin;
-  return ret;
-} // get_types_index()
-
-char
-*getCdatatype(int idx)
-{ /* returns pointer on heap to the indexed string. */
-  char *dtypes[6] = {"int", "int", "int", "char *", "double", NULL};
-  char *ret = xstrdup(dtypes[idx]);
-  return ret;
-} // getCdatatype()
-
-char
-*gethelptext(int idx)
-{ /* returns pointer on heap to the indexed string. */
-  char *ht[6] = {"increases by 1 every time it's invoked. "
-    "Default is 0.",
-     "is set to 1. Default is 0.", "the optarg is converted to a long."
-     " Default is 0.", "is set to a copy of \\f[I]optarg\\f[]. "
-     "Default is NULL.",
-     "the \\f[I]optarg\\f[] is converted to a double. "
-     "Default is 0.0.", NULL};
-  char *ret = xstrdup(ht[idx]);
-  return ret;
-} // gethelptext()
-
-char
-*getCaction(int idx)
-{ /* returns pointer on heap to the indexed string. */
-  char *dactions[6] = {" += 1;", " = 1;",
-                        " = strtol(optarg, NULL, 10);",
-                        " = xstrdup(optarg);",
-                        " = strtod(optarg, NULL);", NULL};
-  char *ret = xstrdup(dactions[idx]);
-  return ret;
-} // getCaction()
-
-char
-*getoptshortname(char *optsdescriptor)
-{ /* return the options short name char as a string. */
-  char two[2];
-  two[0] = optsdescriptor[0];
-  two[1] = 0;
-  char *ret = xstrdup(two);
-  return ret;
-} // getoptshortname()
-
-char
-*getoptslongname(char *optsdescriptor)
-{ /* return the options long name as a string. */
-  char buf[NAME_MAX];
-  strcpy(buf, optsdescriptor+1);
-  char *cp = strchr(buf, ';');
-  *cp = 0;
-  cp = strchr(buf, ':');  // check for opt arg marker;
-  if (cp) *cp = 0;
-  char *ret = xstrdup(buf);
-  return ret;
-} // getoptslongname()
-
-char
-getoptargrequired(char *optsdescriptor)
-{
-  char ret;
-  char *cp = strchr(optsdescriptor, ':');
-  if (!cp) {
-    ret = '0';
-  } else if (*(cp+1) == ':') {
-    ret = '2';
-  } else {
-    ret = '1';
-  }
-  return ret;
-} // getoptargrequired()
-
-
 void
 generatemakefile(prgvar_t *pv)
 { /* the makefile stub is to be copied into the new dir. */
@@ -860,19 +761,6 @@ addautotools(prgvar_t *pv)
   xsystem("automake --add-missing --copy", 1);
   xsystem("autoconf", 1);
 } // addautotools()
-
-char *ucstr(const char *str)
-{ /* return uppercase of str */
-  char buf[PATH_MAX] = {0};
-  char *cp = buf;
-  strcpy(buf, str);
-  while ((*cp)) {
-    *cp = toupper(*cp);
-    cp++;
-  }
-  char *ret = xstrdup(buf);
-  return ret; // caller must free.
-} // ucstr()
 
 void
 makehelperscripts(prgvar_t *pv)
@@ -966,18 +854,6 @@ printerr(char *msg, char *var, int fatal)
   fprintf(stderr, "%s: %s\n", msg, var);
   if (fatal) exit(EXIT_FAILURE);
 } // printerr()
-
-char
-*get_today(void)
-{ /* return result as yyyy-mm-dd (iso 8601) */
-  time_t now = time(NULL);
-  struct tm *lt;
-  lt = localtime(&now);
-  static char buf[NAME_MAX] = {0};
-  sprintf(buf, "%d-%.2d-%.2d", lt->tm_year + 1900, lt->tm_mon + 1,
-          lt->tm_mday);
-  return buf;
-} // get_today()
 
 void
 dohelp(int forced)
