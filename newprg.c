@@ -96,8 +96,9 @@ static void newopt_tfree(newopt_t *no);
 #include "files.h"
 #include "gopt.h"
 #include "firstrun.h"
-static char *version;
+static char *vsn;
 static void dohelp(int forced);
+static void dovsn(void);
 static void is_this_first_run(void);
 static prgvar_t *action_options(options_t *optp);
 static char **getlibsoftwarenames(const char *path, char *nameslist);
@@ -129,8 +130,12 @@ static char *buildlongopts(newopt_t **nopl);
 static char *buildcases(newopt_t **nopl);
 static char *getoptrval(const char *purpose);
 static void placelibs(prgvar_t *pv);
-static void makemain(prgvar_t *pv);
+static void makemain(prgvar_t *pv, newopt_t **nopl);
 static void ulstr(int, char *);
+static void generatepvstruct(mdata *md, newopt_t **nopl);
+
+
+
 
 static void printerr(char *msg, char *var, int fatal);
 static void generatemakefile(prgvar_t *pv);
@@ -143,7 +148,7 @@ static void makehelperscripts(prgvar_t *pv);
 
 int main(int argc, char **argv)
 {  /* newprogram - write the initial files for a new C program. */
-  version = "1.0";
+  vsn = "1.0";
   is_this_first_run(); // check first run
   // data gathering
   options_t opt = process_options(argc, argv);
@@ -155,7 +160,7 @@ int main(int argc, char **argv)
   newopt_t **nopl = makenewoptionslist(pv);
   placelibs(pv);  // software source library code.
   maketargetoptions(pv, nopl);
-  makemain(pv); // make the C source file.
+  makemain(pv, nopl); // make the C source file.
 
   exit(0);
 
@@ -668,18 +673,40 @@ char
 } // purposetoCtype()
 
 void
-makemain(prgvar_t *pv)
+makemain(prgvar_t *pv, newopt_t **nopl)
 { /*  Copy main.c template to source file name and fill in targets. */
   char *pathto = settargetfilename(pv, pv->pi->src);
   copyfile("./templates/main.c", pathto);
   mdata *md = gettargetfile(pv, pv->pi->src);
   setfileownertext(pv, md);
   memreplace(md, "<exename>", pv->pi->exe, NAME_MAX);
-
+  generatepvstruct(md, nopl);
   char *path = settargetfilename(pv, pv->pi->src);
   writefile(path, md->fro, md->to, "w" );
   free_mdata(md);
 } // makemain()
+
+void
+generatepvstruct(mdata *md, newopt_t **nopl)
+{ /* There is an empty prgvar_t struct in the new main(), this
+   * fills it in with data that might be useful.
+  */
+  char buf[PATH_MAX];
+  buf[0] = 0;
+  size_t i;
+  for (i = 0; nopl[i]; i++) {
+    char *vn = nopl[i]->varname;
+    char *pp = nopl[i]->purpose;
+    char *ct = purposetoCtype(pp);
+    char *of = nopl[i]->runfunc;
+    if (strcmp(of, "FIXME") == 0) {
+      char name[NAME_MAX];
+      sprintf(name, "\t%s pvop_%s;\t// FIXME", ct, vn);
+      strjoin(buf, '\n', name, PATH_MAX);
+    } // if()
+  } // for()
+  memreplace(md, "<struct opt>", buf, PATH_MAX);
+} // generatepvstruct()
 
 void
 generatemakefile(prgvar_t *pv)
@@ -873,13 +900,8 @@ dohelp(int forced)
 prgvar_t
 *action_options(options_t *optp)
 {
-/*
-typedef struct options_t {
-	char *options_list;   // output options description text.
-} options_t;
-*/
   if (optp->runhelp) dohelp(0);  // exits, no return;
-  // if (optp->runvsn) dovsn(0);  // exits, no return;
+  if (optp->runvsn) dovsn();  // exits, no return;
   prgvar_t *pv = xmalloc(sizeof(struct prgvar_t));
   pv->libswlist = getlibsoftwarenames("./defaults/lsw.dflt",
                                         optp->software_deps);
@@ -988,3 +1010,10 @@ char
   char **optionslist = list2array(buf, "; ");
   return optionslist;
 } // getoptionslist()
+
+void
+dovsn(void)
+{ /* print version number and quit. */
+  fprintf(stderr, "newprg, version %s\n", vsn);
+  exit(0);
+} // dovsn()

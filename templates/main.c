@@ -39,6 +39,10 @@
 #include <time.h>
 
 // structs
+typedef struct prgvar_t {
+<struct opt>
+<struct arg>
+} prgvar_t;
 
 #include "dirs.h"
 #include "files.h"
@@ -59,6 +63,9 @@ int main(int argc, char **argv)
 { /* main */
   vsn = "1.0";
   is_this_first_run(); // check first run
+  // data gathering
+  options_t opt = process_options(argc, argv);
+  prgvar_t *pv = action_options(&opt);  
   return 0;
 } // main()
 
