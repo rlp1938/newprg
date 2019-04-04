@@ -24,7 +24,8 @@
 char *optstring;
 
 typedef struct options_t {
-  int runhelp;          // main() invokes help()
+  int runhelp;          // main() invokes dohelp()
+  int runvsn;           // main() invokes dovsn()
 	char *software_deps;  // source files to include.
 	char *extra_data;     // eg stuff like config files.
 	char *options_list;   // output options description text.

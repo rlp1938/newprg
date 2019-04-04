@@ -24,10 +24,11 @@
 
 options_t process_options(int argc, char **argv)
 {
-  optstring = ":hd:x:n:";  // initialise
+  optstring = ":hVd:x:n:";  // initialise
 
   options_t opts;
-  opts.runhelp         = 0;
+  opts.runhelp        = 0;
+  opts.runvsn         = 0;
   opts.software_deps  = NULL;
   opts.extra_data     = NULL;
   opts.options_list   = NULL;
@@ -49,6 +50,7 @@ options_t process_options(int argc, char **argv)
     {"depends",       1,  0,  'd' },
     {"extra-dist",    1,  0,  'x' },
     {"options-list",  1,  0,  'n' },
+    {"version",       0,  0,  'V' },
     {0,  0,  0,  0 }
     };
 
@@ -65,6 +67,9 @@ options_t process_options(int argc, char **argv)
     break;
     case 'h':
       opts.runhelp = 1;
+    break;
+    case 'V':
+      opts.runvsn = 1;
     break;
     case 'd':  // output software dependencies for Makefile.am
       strjoin(joinbuffer, ' ',optarg, max);
