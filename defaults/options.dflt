@@ -27,11 +27,10 @@
 # 7. help_text, may be empty, is so, 'FIXME' will be generated. If the
 #   text needs to be very long, use only the headline text with the word
 #   'FIXME' appended. This should avoid "too long errors".
-#   The options descriptor may be line broken if needed.
 
-# 8. function to run, may be empty, if so 'FIXME' will be substituted.
-#   Anything provided by default here should have a function provided
-#   and code should be provided in main.c in ./templates dir.
+# 8. run_func, function to run, may be empty, if so 'FIXME' will be
+# substituted. Anything provided by default here should have a function
+# provided and code should be provided in main.c in ./templates dir.
   
 #1  2   3       4   56   7                                      8
 h,help,runhelp,flag,0,,Displays this help message then quits.,dohelp(0);

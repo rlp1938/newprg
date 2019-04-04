@@ -1,6 +1,6 @@
 .\" Hand written
 .\"
-.TH "NEWPRG" "1" "2017-09-19" "" "General Commands Manual"
+.TH "NEWPRG" "1" "2019-04-04" "" "General Commands Manual"
 .hy
 .SH NAME
 .PP
@@ -29,24 +29,13 @@ editing. If a named dependency is not found a warning will be issued but
 it will be named within the \f[I]Makefile.am\f[] together with the other
 dependencies.
 .PP
-When the \f[B]--help\f[] option is selected an auto generated
-\f[I]manpage\f[] is displayed. This generated page is necessarily quite
-bare containing many instances of the search term 'FIXME' that
-must be replaced with meaningfull text for your new program. So too does
-the generated main C program contain instances of 'FIXME'. When in the
-new program directory run \f[B]./bin/findfixme\f[] to list all instances
-of this word in the project's files.
+Options processing in the generated program is dealt with in accordance
+with the user specified input. This \f[B]--help\f[] option is displayed
+as a generated manpage.
 .SH OPTIONS
 .TP
 .B -h, --help
 Displays this help message then quits.
-.TP
-.B -DY|n|A, --delete-target=y|N|a
-By default, when the target dir exists it will be deleted, ie the answer
-defaults to \f[B]y\f[].
-If the argument is \f[B]N\f[] there will be no replacement and the
-program will exit with an error message, otherwise if the argument is
-\f[B]A\f[] you will be asked.
 
 .TP
 .B The options below may take lists of arguments.
@@ -58,17 +47,20 @@ list items.
 .TP
 .B --depends, -d \f[I]software_name\f[R] or '\f[I]list_of_names'\f[]
 Specify \f[B]additional\f[] software dependencies to be recorded in
- Makefile.am.
+Makefile.am.
 Names that have both a header file and C program file may be input as
 \f[I]name.h+c\f[]. These files need not exist at program generation
 time, however a warning will be issued in this case.
 
 By default, the following list of source files are provided, \f[I]
-files.c+h, str.c+h, and firstrun.c+h.\f[]
+files.c+h, str.c+h, dirs.c+h, \f[]and \f[I]firstrun.c+h.\f[]
 
 .TP
 .B --options-list, -n\f[] \f[I]optcode\f[] or '\f[I]list_of_opcodes\f[]'
-where \f[B]optcode\f[] is a comma separated list of fields in the
+where each optcode \f[I]must\f[] be terminated
+with \f[B];\f[]
+.TP
+The \f[B]optcode\f[] is a comma separated list of fields in the
 following order:
 
 \f[B]short_option\f[] a single character followed by 0,1, or 2 of
@@ -80,8 +72,8 @@ option argument, or optionally may have an option argument respectively.
 \f[B]var_name\f[] the C variable name, the C data type is determined by
 purpose.
 
-\f[B]purpose\f[] this must be one of \f[I]flag, accumulator, int, float,
-string, block\f[]. \f[I]Flag\f[] and \f[I]accumulator\f[] may not
+\f[B]purpose\f[] this must be one of \f[I]flag, acc, int, float,
+string, file\f[]. \f[I]Flag\f[] and \f[I]acc\f[] may not
 have an optional argument and the others must have one. The arithmetic
 types are converted. The string types are built on the heap and must be
 freed after use.
@@ -90,12 +82,17 @@ freed after use.
 0, 0.0 or (char *)NULL, depending on the C data type.
 
 \f[B]max_value\f[] may be an empty string and if so it is ignored.
-Useful for using \f[I]accumulator\f[] for example to specify verbosity.
+Useful for using \f[I]acc\f[] for example to specify verbosity.
 
 \f[B]help_text\f[] This is the text to be used to describe the option
 in the man page. It may be left empty and if so, the value "FIXME" will
-entered by default.
+entered by default. If the text needs to be very long, use only the
+headline text with the word 'FIXME' appended. This should avoid "too
+long errors".
 
+\f[B]run_func\f[], function to run, may be empty, if so 'FIXME' will be
+substituted. Anything provided by default here should have a function
+provided and code should be provided in main.c in ./templates dir.
 .TP
 .B --extra-dist, -x\f[] \f[I]data_file\f[] or \f[I]'list_of_data_files'\f[]
 File(s) to be installed as data in \f[I]/usr/local/share/\f[] such as
@@ -116,8 +113,6 @@ v,version,version,flag,0,,Displays program version number then quits.
 .B -V, --verbosity
 v,verbosity,verbosity,accumulator,0,2,Determines verbosity of programs
 output. Default is 0, maximum verbosity is 2.
-
-Example only, not provided by default.
 
 .SH FILES (Generated project)
 .PP
