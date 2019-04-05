@@ -58,6 +58,8 @@ static void
 dovsn(void);
 static void
 is_this_first_run(void);
+static void
+free_prgvar_t(prgvar_t pv);
 
 int main(int argc, char **argv)
 { /* main */
@@ -104,3 +106,12 @@ is_this_first_run(void)
     exit(EXIT_SUCCESS);
   }
 } // is_this_first_run()
+
+void
+free_prgvar_t(prgvar_t pv)
+{ /* frees the objects built on the heap. */
+  if (!pv) return;
+<fstruct opt>
+<fstruct arg>
+  free(pv);
+} // free_prgvar_t()

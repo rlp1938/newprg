@@ -133,7 +133,11 @@ static void placelibs(prgvar_t *pv);
 static void makemain(prgvar_t *pv, newopt_t **nopl);
 static void ulstr(int, char *);
 static void generatepvstruct(mdata *md, newopt_t **nopl);
-
+static void genpvstructopt(mdata *md, newopt_t **nopl);
+static void genpvstructarg(mdata *md, newopt_t **nopl);
+static void genpvstructfreeopt(mdata *md, newopt_t **nopl);
+static void genpvstructfreearg(mdata *md, newopt_t **nopl);
+static void 
 
 
 
@@ -690,7 +694,17 @@ void
 generatepvstruct(mdata *md, newopt_t **nopl)
 { /* There is an empty prgvar_t struct in the new main(), this
    * fills it in with data that might be useful.
+   * It also provides the code to free this struct.
   */
+  genpvstructopt(md, nopl); // options in the new program.
+  genpvstructarg(md, nopl); // non-opt args in the new program.
+  genpvstructfreeopt(md, nopl); // free the struct objects
+  genpvstructfreearg(md, nopl); // in the new program.
+} // generatepvstruct()
+
+void
+genpvstructopt(mdata *md, newopt_t **nopl)
+{
   char buf[PATH_MAX];
   buf[0] = 0;
   size_t i;
@@ -706,7 +720,53 @@ generatepvstruct(mdata *md, newopt_t **nopl)
     } // if()
   } // for()
   memreplace(md, "<struct opt>", buf, PATH_MAX);
-} // generatepvstruct()
+} // genpvstructopt()
+
+void genpvstructarg(mdata *md, newopt_t **nopl)
+{
+  char buf[PATH_MAX];
+  buf[0] = 0;
+  size_t i;
+  return; // code needs revision first.
+  for (i = 0; nopl[i]; i++) {
+    char *vn = nopl[i]->varname;
+    char *pp = nopl[i]->purpose;
+    char *ct = purposetoCtype(pp);
+    char *of = nopl[i]->runfunc;
+    if (strcmp(of, "FIXME") == 0) {
+      char name[NAME_MAX];
+      sprintf(name, "\t%s pvop_%s;\t// FIXME", ct, vn);
+      strjoin(buf, '\n', name, PATH_MAX);
+    } // if()
+  } // for()
+  memreplace(md, "<struct opt>", buf, PATH_MAX);
+} // genpvstructarg()
+
+void genpvstructfreeopt(mdata *md, newopt_t **nopl)
+{
+  char buf[PATH_MAX];
+  buf[0] = 0;
+  size_t i;
+  for (i = 0; nopl[i]; i++) {
+    char *vn = nopl[i]->varname;
+    char *of = nopl[i]->runfunc;
+    if (strcmp(of, "FIXME") == 0) { // TODO only string C types.
+      char name[NAME_MAX];
+      sprintf(name, "\tif (pv->%s) free(pv->%s);\t// FIXME", vn, vn);
+      strjoin(buf, '\n', name, PATH_MAX);
+    } // if()
+  } // for()
+  memreplace(md, "<fstruct opt>", buf, PATH_MAX);
+} // genpvstructfreeopt()
+
+void genpvstructfreearg(mdata *md, newopt_t **nopl)
+{
+} // genpvstructfreearg()
+
+
+
+
+
 
 void
 generatemakefile(prgvar_t *pv)
