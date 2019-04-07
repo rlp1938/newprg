@@ -10,40 +10,37 @@
 
 # 2. long_option, the long option name.
 
-# 3. var_name, the C variable name, the C data  type  is  determined
-#   by purpose.
+# 3. var_name, the C variable name.
 
-# 4. purpose, this must be one of flag, accumulator, int, float,
-#   string, file. Flag and accumulator may not have an optional
-#   argument and the others must have one. The arithmetic types are
-#   converted. The string types are built on the heap and must be
-#   freed after use.
+# 4. ctype, legal C type of the variable.
 
-# 5. default_value, may be an empty string if the default is to be 0,
+# 5. purpose, used only for int type, maybe 'flag', 'acc', or 'num'.
+
+# 6. default_value, may be an empty string if the default is to be 0,
 #   0.0 or (char *)NULL, depending on the C data type.
 
-# 6. max_value, this may be an empty string, and will be ignored if so.
+# 7. max_value, this may be an empty string, and will be ignored if so.
 
-# 7. help_text, may be empty, is so, 'FIXME' will be generated. If the
+# 8. help_text, may be empty, is so, 'FIXME' will be generated. If the
 #   text needs to be very long, use only the headline text with the word
 #   'FIXME' appended. This should avoid "too long errors".
 
-# 8. run_func, function to run, may be empty, if so 'FIXME' will be
+# 9. run_func, function to run, may be empty, if so 'FIXME' will be
 # substituted. Anything provided by default here should have a function
 # provided and code should be provided in main.c in ./templates dir.
   
-#1  2   3       4   56   7                                      8
-h,help,runhelp,flag,0,,Displays this help message then quits.,dohelp(0);
+#1  2   3       4   5   67       8                               9_>
+h,help,runhelp,int,flag,0,,Displays this help message then quits. ,dohelp(0);
 
-#1  2       3      4  56  7                                         8->
-v,version,runvsn,flag,0,,Displays program version number then quits.,dovsn();
+#1  2       3      4  5   67         8                               9->
+v,version,runvsn,int,flag,0,,Displays program version number then quits.,dovsn();
 
-b,bullshit,nosense,acc,,3,Controls how much bullshit is output,; #2
+b,bullshit,nosense,int,acc,,3,Controls how much bullshit is output,; #2
 
-c:,crap,rubbish,float,3.14159,,Just floats away.,; #3
+c:,crap,rubbish,double,,3.14159,,Just floats away.,; #3
 
-s:,sentence,strvar,string,,,String it out.,; #4
+s:,sentence,strvar,char*,,,,String it out.,; #4
 
-i:,number,ival,int,,,Gimme a number between 1 and 10,; #5
+i:,number,ival,int,num,,,Gimme a number between 1 and 10,; #5
 
-f:,file,path,file,,,Path to file,; #6
+f:,file,path,char*,,,,Path to file,; #6

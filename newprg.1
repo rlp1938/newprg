@@ -69,14 +69,11 @@ option argument, or optionally may have an option argument respectively.
 
 \f[B]long_option\f[] the option long name.
 
-\f[B]var_name\f[] the C variable name, the C data type is determined by
-purpose.
+\f[B]var_name\f[] the C variable name.
 
-\f[B]purpose\f[] this must be one of \f[I]flag, acc, int, float,
-string, file\f[]. \f[I]Flag\f[] and \f[I]acc\f[] may not
-have an optional argument and the others must have one. The arithmetic
-types are converted. The string types are built on the heap and must be
-freed after use.
+\f[B]ctype,\f[] legal C type of the variable.
+
+\f[B]purpose\f[], used only for int type, maybe 'flag', 'acc', or 'num'.
 
 \f[B]default_value\f[] may be an empty string if the default is to be
 0, 0.0 or (char *)NULL, depending on the C data type.
@@ -102,17 +99,18 @@ config files.
 .SH EXAMPLE OPTCODES
 .TP
 .B -h, --help
-h,help,help,flag,0,,Displays this help message then quits.
+h,help,runhelp,int,flag,0,,Displays this help message then quits.
+,dohelp(0);
 
-Provided by default in generated program.
 .TP
 .B -v, --version
-v,version,version,flag,0,,Displays program version number then quits.
+v,version,runvsn,int,flag,0,,Displays program version number then quits.
+,dovsn();
 
 .TP
 .B -V, --verbosity
-v,verbosity,verbosity,accumulator,0,2,Determines verbosity of programs
-output. Default is 0, maximum verbosity is 2.
+v,verbosity,runverbose,int,acc,0,2,Determines verbosity of programs
+output. Default is 0, maximum verbosity is 2.,;
 
 .SH FILES (Generated project)
 .PP

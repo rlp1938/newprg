@@ -71,15 +71,9 @@ typedef struct newopt_t { /* the options to be processed in the new
                             program. */
   char *shortopt; // short option char with 0-2 ':' appended.
   char *longopt;  // long option name.
-  char *varname;  // The C variable name, purpose decides the type.
-  char *purpose;  /* Technical purpose of the option:
-                    * flag, C int. No optarg.
-                    * acc, accumulator, C int. No optarg. May set max.
-                    * int, C int, Must have optarg. Conversion done.
-                    * float, C double. Converts optarg.
-                    * string, C char*.
-                    * block, a file path.
-                  */
+  char *varname;  // The C variable name.
+  char *ctype;    // Legal C type of the variable.
+  char *purpose;  // flag, acc, or num. Only for ctype == int.
   char *dflt_val;  // default value. May be 0 length, if so,
                   // "0", "0.0", or (char*) NULL will be used.
   char *max_val;  // If empty it will be ignored.
@@ -116,6 +110,7 @@ static int validateoptsdescriptor(char *optsdescriptor);
 static int validshortname(char *buf);
 static int validlongname(char *buf);
 static int validpurpose(char *buf);
+static int validCtype(char *buf);
 static char *getdflt(char *purpose);
 static void maketargetoptions(prgvar_t *pv, newopt_t **nopl);
 static void maketoheader(prgvar_t *pv, newopt_t **nopl);
@@ -123,12 +118,11 @@ static void maketoCfile(prgvar_t *pv, newopt_t **nopl);
 static mdata *gettargetfile(prgvar_t *pv, const char *fn);
 static void setfileownertext(prgvar_t *pv, mdata *md);
 static char *settargetfilename(prgvar_t *pv, const char *fn);
-static char *purposetoCtype(const char *purpose);
 static char *buildoptstring(newopt_t **nopl);
 static char *builddefaults(newopt_t **nopl);
 static char *buildlongopts(newopt_t **nopl);
 static char *buildcases(newopt_t **nopl);
-static char *getoptrval(const char *purpose);
+static char *getoptrval(const char *ctype, const char *purpose);
 static void placelibs(prgvar_t *pv);
 static void makemain(prgvar_t *pv, newopt_t **nopl);
 static void ulstr(int, char *);
@@ -311,6 +305,7 @@ newopt_t
 *makenewoption(char *optsdescriptor) // the struct
 { /* */
   validateoptsdescriptor(optsdescriptor); // exits on error.
+  //fprintf(stderr, "%s\n", optsdescriptor);
   newopt_t *nop = xmalloc(sizeof(newopt_t));
   char buf[PATH_MAX];
   char objbuf[NAME_MAX];
@@ -332,30 +327,37 @@ newopt_t
   strcpy(objbuf, obj);
   if (strlen(objbuf)) nop->varname = xstrdup(objbuf);
     else nop->varname = "FIXME";
-  obj = comma + 1;  // field # 4, purpose.
+  obj = comma + 1;  // field # 4, ctype.
   while (*comma != ',') comma++;
   *comma = 0;
   strcpy(objbuf, obj);
-  if (validpurpose(objbuf)) nop->purpose = xstrdup(objbuf);
-  obj = comma + 1;  // field # 5, dflt_val.
+  if (validCtype(objbuf)) nop->ctype = xstrdup(objbuf);
+  obj = comma + 1;  // field # 5, purpose.
+  while (*comma != ',') comma++;
+  *comma = 0;
+  strcpy(objbuf, obj);
+  if (strlen(objbuf)) {
+    if (validpurpose(objbuf)) nop->purpose = xstrdup(objbuf);
+  } else nop->purpose = (char *)NULL;
+  obj = comma + 1;  // field # 6, dflt_val.
   while (*comma != ',') comma++;
   *comma = 0;
   strcpy(objbuf, obj);
   if (strlen(objbuf)) nop->dflt_val = xstrdup(objbuf);
-    else nop->dflt_val = getdflt(nop->purpose);
-  obj = comma + 1;  // field # 6, max_val.
+    else nop->dflt_val = getdflt(nop->ctype);
+  obj = comma + 1;  // field # 7, max_val.
   while (*comma != ',') comma++;
   *comma = 0;
   strcpy(objbuf, obj);
   if (strlen(objbuf)) nop->max_val = xstrdup(objbuf);
     else nop->max_val = (char*)NULL;
-  obj = comma + 1;  // field # 7, help_txt.
+  obj = comma + 1;  // field # 8, help_txt.
   while (*comma != ',') comma++;
   *comma = 0;
   strcpy(objbuf, obj);
   if (strlen(objbuf)) nop->help_txt = xstrdup(objbuf);
     else nop->help_txt = xstrdup("FIXME");
-  obj = comma + 1;  // field # 8, runfunc.
+  obj = comma + 1;  // field # 9, runfunc.
   strcpy(objbuf, obj);
   if (strlen(objbuf)) nop->runfunc = xstrdup(objbuf);
     else nop->runfunc = xstrdup("FIXME");
@@ -364,16 +366,16 @@ newopt_t
 
 int
 validateoptsdescriptor(char *optsdescriptor)
-{ /* The optsdescriptor has 8 fields, comma separated.
-   * So there must be 7 commas, more or fewer is an error.
+{ /* The optsdescriptor has 9 fields, comma separated.
+   * So there must be 8 commas, more or fewer is an error.
   */
   size_t i;
   size_t count = 0;
   for (i = 0; optsdescriptor[i]; i++) {
     if (optsdescriptor[i] == ',') count++;
   }
-  if (count != 7) {
-    fprintf(stderr, "Option descriptor string must have 7 commas.\n"
+  if (count != 8) {
+    fprintf(stderr, "Option descriptor string must have 8 commas.\n"
                     "%s\n", optsdescriptor);
     exit(EXIT_FAILURE);
   }
@@ -430,11 +432,28 @@ validlongname(char *buf)
 int
 validpurpose(char *buf)
 { /* must be in a list, if not abort */
-  char *list[7] = { "flag","acc","int","float", "string", "file",
-                    NULL };
+  char *list[4] = { "flag","acc","num", NULL };
   int ret = instrlist(buf, list);
   if (!ret) {
     fprintf(stderr, "Purpose, not in list:\n");
+    size_t i;
+    for (i = 0; list[i]; i++) {
+      fprintf(stderr, "%s, ", list[i]);
+    }
+    fprintf(stderr, "purpose: %s, ", buf);
+    fputs("\n", stderr);
+    exit(EXIT_FAILURE);
+  } // if()
+  return 1;
+} // validpurpose()
+
+int validCtype(char *buf)
+{ /* must be in a list, if not abort */
+  char *list[4] = { "int","double", "char*", NULL };
+  // yes highly restricted C types allowed.
+  int ret = instrlist(buf, list);
+  if (!ret) {
+    fprintf(stderr, "C type, not in list:\n");
     size_t i;
     for (i = 0; list[i]; i++) {
       fprintf(stderr, "%s, ", list[i]);
@@ -443,17 +462,16 @@ validpurpose(char *buf)
     exit(EXIT_FAILURE);
   } // if()
   return 1;
-} // validpurpose()
+} // validCtype()
 
 char
-*getdflt(char *purpose)
+*getdflt(char *ctype)
 { /* do a dictionary lookup to find the default zero value. */
-  char *list[] = { "flag=0", "acc=0", "int=0", "float=0.0",
-                  "string=(char*)NULL", "file=(char*)NULL", NULL};
+  char *list[4] = { "int=0", "double=0.0", "char*=(char*)NULL", NULL};
   static char buf[PATH_MAX];
-  char *cp = dictionary(list, purpose);
+  char *cp = dictionary(list, ctype);
   if (!cp) {
-    fprintf(stderr, "Invalid option purpose: %s\n", purpose);
+    fprintf(stderr, "Invalid option ctype: %s\n", ctype);
     exit(EXIT_FAILURE);
   }
   strcpy(buf, cp);
@@ -521,14 +539,17 @@ maketoheader(prgvar_t *pv, newopt_t **nopl)
   size_t i;
   for (i = 0; nopl[i]; i++) {
     char *purpose = nopl[i]->purpose;
-    char *ctype = purposetoCtype(purpose);
+    char *ctype = nopl[i]->ctype;
     char *vname = nopl[i]->varname;
     char *cmnt = nopl[i]->runfunc;
+    char *cp;
+    if (purpose) cp = purpose; else cp = ctype;
     char line[NAME_MAX];
-    sprintf(line, "\t%s\t%s\t// %s, %s", ctype, vname, purpose, cmnt);
+    sprintf(line, "\t%s\t%s\t// %s, %s", ctype, vname, cp, cmnt);
     strjoin(buf, '\n', line, PATH_MAX);
   }
   memreplace(md, "<struct>", buf, PATH_MAX);
+  memreplace(md, "char*\t", "char\t*", 16);
   char *path = settargetfilename(pv, "gopt.h");
   writefile(path, md->fro, md->to, "w" );
   free_mdata(md);
@@ -614,7 +635,7 @@ char
   for (i = 0; nopl[i]; i++) {
     char *so = nopl[i]->shortopt;
     char *vn = nopl[i]->varname;
-    char *rv = getoptrval(nopl[i]->purpose);
+    char *rv = getoptrval(nopl[i]->ctype, nopl[i]->purpose);
     char name[NAME_MAX];
     sprintf(name, "\t\tcase \'%c\':\n\t\t\topts.%s = %s;",
               so[0], vn, rv);
@@ -626,18 +647,19 @@ char
 } // buildcases()
 
 char
-*getoptrval(const char *purpose)
-{ /* From options purpose, return the value to the varname. */
-  char *list[7] = {
-    "flag= 1",
-    "acc= 1",
-    "int= atol(argv, NULL, 10)",
-    "float= atod(argv, NULL)",
-    "string= xstrdup(argv)",
-    "file= xstrdup(argv)",
+*getoptrval(const char *ctype, const char *purpose)
+{ /* From options ctype or purpose, return the value to the varname. */
+  if (strcmp(ctype, "int") == 0) {
+    char *plist[4] = {"flag= 1", "acc= 1",
+      "num= atol(argv, NULL, 10)", NULL };
+    return dictionary(plist, purpose);
+  }
+  char *list[3] = {
+    "double= atod(argv, NULL)",
+    "char*= xstrdup(argv)",
     NULL
   };
-  return dictionary(list, purpose);
+  return dictionary(list, ctype);
 } // getoptrval()
 
 mdata
@@ -667,14 +689,6 @@ char
   strjoin(path, '/', fn, PATH_MAX);
   return path;
 } // settargetfilename()
-
-char
-*purposetoCtype(const char *purpose)
-{
-  char *list[7] = { "flag=int", "acc=int", "int=int", "float=double",
-    "string=char*", "file=char*", NULL };
-    return dictionary(list, purpose);
-} // purposetoCtype()
 
 void
 makemain(prgvar_t *pv, newopt_t **nopl)
@@ -711,7 +725,7 @@ genpvstructopt(mdata *md, newopt_t **nopl)
   for (i = 0; nopl[i]; i++) {
     char *vn = nopl[i]->varname;
     char *pp = nopl[i]->purpose;
-    char *ct = purposetoCtype(pp);
+    char *ct = nopl[i]->ctype;
     char *of = nopl[i]->runfunc;
     if (strcmp(of, "FIXME") == 0) {
       char name[NAME_MAX];
