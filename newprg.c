@@ -538,8 +538,10 @@ maketoheader(prgvar_t *pv, newopt_t **nopl)
     char *ctype = nopl[i]->ctype;
     char *vname = nopl[i]->varname;
     char *cmnt = nopl[i]->runfunc;
+    char *cp;
+    if (purpose) cp = purpose; else cp = ctype;
     char line[NAME_MAX];
-    sprintf(line, "\t%s\t%s\t// %s, %s", ctype, vname, purpose, cmnt);
+    sprintf(line, "\t%s\t%s\t// %s, %s", ctype, vname, cp, cmnt);
     strjoin(buf, '\n', line, PATH_MAX);
   }
   memreplace(md, "<struct>", buf, PATH_MAX);
