@@ -37,10 +37,10 @@ v,version,runvsn,int,flag,0,,Displays program version number then quits.,dovsn()
 
 b,bullshit,nosense,int,acc,,3,Controls how much bullshit is output,; #2
 
-c:,crap,rubbish,double,3.14159,,Just floats away.,; #3
+c:,crap,rubbish,double,,3.14159,,Just floats away.,; #3
 
-s:,sentence,strvar,char *,,,,String it out.,; #4
+s:,sentence,strvar,char*,,,,String it out.,; #4
 
 i:,number,ival,int,num,,,Gimme a number between 1 and 10,; #5
 
-f:,file,path,char *,,,,Path to file,; #6
+f:,file,path,char*,,,,Path to file,; #6
