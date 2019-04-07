@@ -131,7 +131,8 @@ static void genpvstructopt(mdata *md, newopt_t **nopl);
 static void genpvstructarg(mdata *md, newopt_t **nopl);
 static void genpvstructfreeopt(mdata *md, newopt_t **nopl);
 static void genpvstructfreearg(mdata *md, newopt_t **nopl);
-static void 
+static void fmtoutputctl(prgvar_t *pv);
+static void fmtoutput(mdata *md);
 
 
 
@@ -159,7 +160,7 @@ int main(int argc, char **argv)
   placelibs(pv);  // software source library code.
   maketargetoptions(pv, nopl);
   makemain(pv, nopl); // make the C source file.
-
+  fmtoutputctl(pv);
   exit(0);
 
 
@@ -549,7 +550,7 @@ maketoheader(prgvar_t *pv, newopt_t **nopl)
     strjoin(buf, '\n', line, PATH_MAX);
   }
   memreplace(md, "<struct>", buf, PATH_MAX);
-  memreplace(md, "char*\t", "char\t*", 16);
+  memreplace(md, "char*\t", "char\t*", 16); // char* xyz -> char *xyz
   char *path = settargetfilename(pv, "gopt.h");
   writefile(path, md->fro, md->to, "w" );
   free_mdata(md);
@@ -1091,3 +1092,40 @@ dovsn(void)
   fprintf(stderr, "newprg, version %s\n", vsn);
   exit(0);
 } // dovsn()
+
+void
+fmtoutputctl(prgvar_t *pv)
+{ /* I have configured my code editor to replace a typed in tab with
+   * 2 spaces, but all generated code has indents produced by real
+   * tabs. This function names the output files affected and sends them
+   * to fmtoutput() to have the tabs replaced with 2 spaces.
+  */
+  char *fn[] = {"gopt.h", "gopt.c", pv->pi->src, (char*)NULL};
+  size_t i;
+  for (i = 0; fn[i]; i++) {
+    mdata *md = gettargetfile(pv, fn[i]);
+    fmtoutput(md);
+    char *path = settargetfilename(pv, fn[i]);
+    writefile(path, md->fro, md->to, "w");
+    free_mdata(md);
+  }
+} // fmtoutputctl()
+
+void
+fmtoutput(mdata *md)
+{ /* Replaces "\t" in *md with "  ".
+   * What is really needed is to place all objects after a tab
+   * replacement at an even numbered column. This thing is too stupid
+   * to do that. But WTF, the target files will need editing anyway.
+  */
+  char srchbuf[NAME_MAX];
+  char replbuf[NAME_MAX];
+  strcpy(srchbuf, "\t\t\t\t\t\t\t\t");
+  strcpy(replbuf, "                ");
+  size_t i;
+  for (i = 7; i > 0; i--) {
+    srchbuf[i] = 0;
+    replbuf[2*i] = 0;
+    memreplace(md, srchbuf, replbuf, 128);
+  } // for()
+} // fmtoutput()
